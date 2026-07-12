@@ -9,8 +9,8 @@
 .
 ├── public/              ← ไฟล์เกมทั้งหมด (HTML/CSS/JS เดิม)
 │   ├── index.html
-│   ├── styleเมือง ธีมขาว.css
-│   ├── styleเมือง ธีมดำ.css
+│   ├── style-city-light.css
+│   ├── style-city-dark.css
 │   └── js/...
 ├── server.js            ← เว็บเซิร์ฟเวอร์ Express
 ├── package.json
@@ -35,7 +35,8 @@ npm start
 ## 📤 ขั้นตอนที่ 1: อัปโหลดขึ้น GitHub
 
 1. สร้าง repository ใหม่บน GitHub (เช่น `city-government-sim`)
-2. ในโฟลเดอร์นี้ รันคำสั่ง:
+2. รัน `npm install` ในโฟลเดอร์นี้ก่อน (ยังไม่เคยรัน จะได้ `package-lock.json` และโฟลเดอร์ `node_modules` — ตัวหลังถูก ignore ไว้แล้วใน `.gitignore` ไม่ต้องกังวล)
+3. รันคำสั่ง:
 
 ```bash
 git init
@@ -63,5 +64,8 @@ git push -u origin main
 
 ## 🛠️ หมายเหตุทางเทคนิค
 
-- `taxRate.js` ในโปรเจกต์เดิมเป็นไฟล์ว่าง (0 bytes) — คัดลอกมาตามเดิม ถ้าตั้งใจให้มีโค้ดควรตรวจสอบไฟล์ต้นฉบับอีกครั้ง
-- ไฟล์ CSS/HTML ที่มีชื่อเป็นภาษาไทยและมีช่องว่าง (เช่น `styleเมือง ธีมขาว.css`) ทำงานได้ปกติเพราะ HTML อ้างอิงชื่อไฟล์ตรงกัน แต่ถ้าต้องการความเรียบร้อยขึ้น แนะนำเปลี่ยนชื่อเป็นภาษาอังกฤษไม่มีช่องว่างในอนาคต
+- `/health` endpoint คืน `200 { status: 'ok' }` — ใช้ให้ Railway เช็คว่า service พร้อมรับ traffic
+- เปิดใช้ `compression` middleware (gzip) สำหรับไฟล์ static ทั้งหมด
+- Catch-all route ตอนนี้แยกแยะ asset request (มีนามสกุลไฟล์) กับการ navigate หน้าเว็บ — asset ที่หาไม่เจอจะได้ `404` จริง ส่วน path อื่นจะ fallback ไป `index.html` ตามปกติของ SPA
+- ไฟล์ `taxRate.js` (0 bytes, ไม่ถูกอ้างอิงที่ไหน) ถูกลบออกแล้ว
+- ไฟล์ CSS/JS ที่เคยตั้งชื่อเป็นภาษาไทยมีช่องว่าง เปลี่ยนเป็น `style-city-light.css`, `style-city-dark.css`, `scriptCity.js` แล้ว เพื่อความเข้ากันได้กับทุกระบบ
