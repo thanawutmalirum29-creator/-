@@ -306,6 +306,7 @@ button, h1{ font-feature-settings: "kern"; }
   width:420px;
   max-width:90%;
   max-height:85vh;
+  max-height:85dvh; /* ใช้ dynamic viewport height บนมือถือ กันปัญหา address bar ซ่อน/โผล่ทำให้กล่องเกินจอ */
   box-shadow: var(--shadow);
   border:1px solid rgba(255,255,255,.06);
   display:flex;
@@ -315,6 +316,7 @@ button, h1{ font-feature-settings: "kern"; }
 .modal-body{
   padding:20px;
   overflow-y:auto;
+  overscroll-behavior:contain; /* กันลากนิ้วเลื่อนในกล่องแล้วหลุดไปเลื่อนหน้าเว็บด้านหลัง */
 }
 .modal-body pre{
   white-space:pre-wrap;
