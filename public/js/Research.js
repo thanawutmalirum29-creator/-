@@ -178,6 +178,11 @@ function showModal(content) {
     let existingOverlay = document.getElementById("modal-overlay");
     if (existingOverlay) existingOverlay.remove();
 
+    // ล็อกไม่ให้หน้าเว็บด้านหลังเลื่อนได้ขณะ popup เปิดอยู่
+    // (ไม่งั้นตอนลากนิ้วเลื่อนดูรายชื่อยาว ๆ ในกล่อง จะลากพื้นหลังเลื่อนตามไปด้วย
+    // ทำให้ popup ดูเหมือนหลุดจากกลางจอ)
+    document.body.style.overflow = "hidden";
+
     // สร้าง div overlay (ใช้คลาส CSS แทน inline style ขาวล้วน
     // เพื่อให้รองรับธีมมืดด้วย)
     let overlay = document.createElement("div");
@@ -204,6 +209,7 @@ function closeModal() {
         return;
     }
     modalLevel = null;
+    document.body.style.overflow = ""; // คืนค่าให้หน้าเว็บเลื่อนได้ตามปกติ
     let overlay = document.getElementById("modal-overlay");
     if (overlay) overlay.remove();
 }
