@@ -282,12 +282,31 @@ html, body {
   background: var(--card);
   color: var(--text);
   border-radius:var(--radius);
-  padding:20px;
   width:420px;
   max-width:90%;
   max-height:85vh;
-  overflow-y:auto;
   box-shadow: var(--shadow);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.modal-body{
+  padding:20px;
+  overflow-y:auto;
+}
+.modal-body pre{
+  white-space:pre-wrap;
+  word-break:break-word;
+  font-family:inherit;
+  font-size:13px;
+  line-height:1.6;
+  margin:0;
+}
+.modal-footer{
+  flex-shrink:0;
+  padding:12px 20px;
+  border-top:1px solid rgba(0,0,0,.08);
+  text-align:right;
 }
 .modal-box input, .modal-box textarea{
   font-family:inherit;
