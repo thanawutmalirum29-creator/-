@@ -9,81 +9,185 @@
     <button id="themeToggleBtn" class="theme-toggle" title="สลับธีมสว่าง/มืด">🌙 โหมดมืด</button>
   </h1>
 
-  <div id="info" class="section"></div>
-  <div class="section">
-    <button onclick="nextMonth()">▶ เดือนถัดไป</button>
-    <button id="festivalBtn">🎉 จัดเทศกาล</button>
-    <button onclick="buyFood()">🍛ซื้ออาหาร</button>
-  <button onclick="openSaveManager()">📂 เซฟเกม</button>
-
+  <!-- 🔹 แถบสถานะลอยติดด้านบน แสดงข้อมูลสำคัญตลอดเวลาแม้เลื่อนหน้าจอ -->
+  <div id="statusBar" class="status-bar">
+    <div class="stat-chip" id="stat_date" title="วัน/เดือน/ปีในเกม">📅 -</div>
+    <div class="stat-chip" id="stat_treasury" title="เงินคงคลัง">💰 -</div>
+    <div class="stat-chip" id="stat_happiness" title="ความสุขประชาชน">😊 -</div>
+    <div class="stat-chip" id="stat_food" title="อาหารคงเหลือ">🍽️ -</div>
+    <div class="stat-chip" id="stat_population" title="จำนวนประชากร">👨‍👩‍👧‍👦 -</div>
+    <div class="stat-chip" id="stat_debt" title="หนี้สินคงเหลือ">💳 -</div>
   </div>
-<!-- 🔸 หน้าต่างจัดการเซฟ -->
-<div id="saveManager" class="modal-overlay" style="display:none;">
 
-  <div class="modal-box">
-    <h2>💾 การจัดการเซฟเกม</h2>
-
-    <div class="save-new-row">
-      <input id="newSaveName" placeholder="ชื่อเซฟใหม่...">
-      <button onclick="createNewSave()">บันทึก</button>
+  <!-- 🔹 การกระทำหลักที่ใช้บ่อยที่สุด อยู่บนสุดเสมอ -->
+  <div class="section quick-actions">
+    <h3>⚡ การกระทำหลัก</h3>
+    <div class="quick-actions-row">
+      <button class="primary-action" onclick="nextMonth()">▶ เดือนถัดไป</button>
+      <button id="festivalBtn">🎉 จัดเทศกาล</button>
+      <button onclick="buyFood()">🍛 ซื้ออาหาร</button>
+      <button onclick="requestLoan()">📥 กู้เงิน</button>
+      <button onclick="openResearchCenter()">🏛️ ศูนย์วิจัย</button>
+      <button onclick="openSaveManager()">📂 เซฟเกม</button>
     </div>
-
-    <div id="saveList" class="save-list">
-      <!-- รายชื่อเซฟจะแสดงตรงนี้ -->
-    </div>
-
-    <br>
-    <button onclick="closeSaveManager()">ปิด</button>
   </div>
-</div>
-  <div class="section">
-    <h3>งบประมาณบริการรัฐ</h3>
-      <div id="loanPanel">
-  <button onclick="requestLoan()">📥 กู้เงิน</button><br>
-  <span id="loanStatus">💳 หนี้สิน: 0 บาท</span><br><br>
 
+  <!-- 🔸 หน้าต่างจัดการเซฟ -->
+  <div id="saveManager" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <h2>💾 การจัดการเซฟเกม</h2>
 
-    <div class="section">
+      <div class="save-new-row">
+        <input id="newSaveName" placeholder="ชื่อเซฟใหม่...">
+        <button onclick="createNewSave()">บันทึก</button>
+      </div>
+
+      <div id="saveList" class="save-list">
+        <!-- รายชื่อเซฟจะแสดงตรงนี้ -->
+      </div>
+
+      <br>
+      <button onclick="closeSaveManager()">ปิด</button>
+    </div>
+  </div>
+
+  <!-- 🔹 รายงานภาพรวมโดยละเอียด พับเก็บไว้เป็นค่าเริ่มต้น ไม่บังของสำคัญด้านล่าง -->
+  <details class="section info-details" id="overviewDetails">
+    <summary>📊 รายงานภาพรวมโดยละเอียด <span class="hint">(กดเพื่อดู/ซ่อน)</span></summary>
+    <div id="info" class="section-nested"></div>
+  </details>
+
+  <!-- 🔹 งบประมาณ + จ้างข้าราชการ รวมเป็นการ์ดต่อกระทรวงเดียวกัน พร้อมค้นหา -->
+  <div class="section" id="deptSection">
+    <h3>🏛️ งบประมาณ &amp; ข้าราชการ แยกตามกระทรวง</h3>
+
+    <div class="dept-toolbar">
+      <input id="deptSearch" type="text" placeholder="🔍 ค้นหากระทรวง เช่น ตำรวจ, อาหาร, ภาษี..." oninput="filterDepartments()">
       <button id="fundAllBtn" onclick="fundAll()">💰 จ่ายงบทั้งหมด</button>
     </div>
-    <div class="button-grid">
-      <button id="btn_park" onclick="fund('park')">🌲🎄กระทรวงสวนสาธารณะ</button>
-      <button id="btn_health" onclick="fund('health')">💊 กระทรวงสาธารณสุข</button>
-      <button id="btn_police" onclick="fund('police')">👮 สถานีรักษาความปลอดภัย</button>
-      <button id="btn_infrastructure" onclick="fund('infrastructure')">🛣️ งบประมาณโครงสร้าง</button>
-      <button id="btn_education" onclick="fund('education')">🎓 กระทรวงการศึกษาธิการ</button>
-      <button id="btn_military" onclick="fund('military')">🎖️ กระทรวงกลาโหม</button>
-      <button id="btn_transport" onclick="fund('transport')">🚌 กระทรวงขนส่ง</button>
-      <button id="btn_scholarship" onclick="fund('scholarship')">🎓💵 ทุนการศึกษา</button>
-      <button id="btn_environment" onclick="fund('environment')">🌲🏞️กระทรวงสิ่งแวดล้อม</button>
-      <button id="btn_disaster" onclick="fund('disaster')">🌊กระทรวงบรรเทาสาธารณะภัย</button>
-      <button id="btn_tourism" onclick="fund('tourism')">🛬กระทรวงการท่องเที่ยว</button>
-      <button id="btn_technology" onclick="fund('technology')">🛰️วิทยาศาสตร์และเทคโนโลยี</button>
+
+    <div id="loanPanel" class="loan-panel">
+      <span id="loanStatus">💳 หนี้สิน: 0 บาท</span>
     </div>
+
+    <div class="dept-grid" id="deptGrid">
+      <div class="dept-card" data-name="กระทรวงสวนสาธารณะ สวนสาธารณะ park">
+        <div class="dept-head"><span class="dept-emoji">🌲</span><span class="dept-title">กระทรวงสวนสาธารณะ</span></div>
+        <div class="dept-actions">
+          <button id="btn_park" onclick="fund('park')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('park')">👨‍⚕️ จ้างข้าราชการ <span class="servant-count" id="count_park">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงสาธารณสุข health">
+        <div class="dept-head"><span class="dept-emoji">💊</span><span class="dept-title">กระทรวงสาธารณสุข</span></div>
+        <div class="dept-actions">
+          <button id="btn_health" onclick="fund('health')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('health')">👨‍⚕️ จ้างข้าราชการ <span class="servant-count" id="count_health">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="สถานีรักษาความปลอดภัย ตำรวจ police">
+        <div class="dept-head"><span class="dept-emoji">👮</span><span class="dept-title">สถานีรักษาความปลอดภัย</span></div>
+        <div class="dept-actions">
+          <button id="btn_police" onclick="fund('police')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('police')">👮‍♂️ จ้างข้าราชการ <span class="servant-count" id="count_police">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="งบประมาณโครงสร้าง โครงสร้างพื้นฐาน infrastructure">
+        <div class="dept-head"><span class="dept-emoji">🛣️</span><span class="dept-title">งบประมาณโครงสร้าง</span></div>
+        <div class="dept-actions">
+          <button id="btn_infrastructure" onclick="fund('infrastructure')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('infrastructure')">🛣️ จ้างข้าราชการ <span class="servant-count" id="count_infrastructure">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงการศึกษาธิการ การศึกษา education">
+        <div class="dept-head"><span class="dept-emoji">🎓</span><span class="dept-title">กระทรวงการศึกษาธิการ</span></div>
+        <div class="dept-actions">
+          <button id="btn_education" onclick="fund('education')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('education')">👨‍🏫 จ้างข้าราชการ <span class="servant-count" id="count_education">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงกลาโหม ทหาร military">
+        <div class="dept-head"><span class="dept-emoji">🎖️</span><span class="dept-title">กระทรวงกลาโหม</span></div>
+        <div class="dept-actions">
+          <button id="btn_military" onclick="fund('military')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('military')">🪖 จ้างข้าราชการ <span class="servant-count" id="count_military">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงขนส่ง transport">
+        <div class="dept-head"><span class="dept-emoji">🚌</span><span class="dept-title">กระทรวงขนส่ง</span></div>
+        <div class="dept-actions">
+          <button id="btn_transport" onclick="fund('transport')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('transport')">🚍 จ้างข้าราชการ <span class="servant-count" id="count_transport">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="ทุนการศึกษา scholarship">
+        <div class="dept-head"><span class="dept-emoji">🎓💵</span><span class="dept-title">ทุนการศึกษา</span></div>
+        <div class="dept-actions">
+          <button id="btn_scholarship" onclick="fund('scholarship')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('scholarship')">👦💵 จ้างข้าราชการ <span class="servant-count" id="count_scholarship">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงสิ่งแวดล้อม environment">
+        <div class="dept-head"><span class="dept-emoji">🌲🏞️</span><span class="dept-title">กระทรวงสิ่งแวดล้อม</span></div>
+        <div class="dept-actions">
+          <button id="btn_environment" onclick="fund('environment')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('environment')">🚮♻️ จ้างข้าราชการ <span class="servant-count" id="count_environment">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงบรรเทาสาธารณะภัย ภัยพิบัติ disaster">
+        <div class="dept-head"><span class="dept-emoji">🌊</span><span class="dept-title">กระทรวงบรรเทาสาธารณะภัย</span></div>
+        <div class="dept-actions">
+          <button id="btn_disaster" onclick="fund('disaster')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('disaster')">🧑‍🚒 จ้างข้าราชการ <span class="servant-count" id="count_disaster">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="กระทรวงการท่องเที่ยว tourism">
+        <div class="dept-head"><span class="dept-emoji">🛬</span><span class="dept-title">กระทรวงการท่องเที่ยว</span></div>
+        <div class="dept-actions">
+          <button id="btn_tourism" onclick="fund('tourism')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('tourism')">👨‍✈️ จ้างข้าราชการ <span class="servant-count" id="count_tourism">0</span></button>
+        </div>
+      </div>
+
+      <div class="dept-card" data-name="วิทยาศาสตร์และเทคโนโลยี technology">
+        <div class="dept-head"><span class="dept-emoji">🛰️</span><span class="dept-title">วิทยาศาสตร์และเทคโนโลยี</span></div>
+        <div class="dept-actions">
+          <button id="btn_technology" onclick="fund('technology')">💰 จ่ายงบ</button>
+          <button onclick="hireCivilServant('technology')">🧑‍🔬 จ้างข้าราชการ <span class="servant-count" id="count_technology">0</span></button>
+        </div>
+      </div>
+    </div>
+
+    <p id="deptNoResult" class="dept-no-result" style="display:none;">ไม่พบกระทรวงที่ค้นหา 🔍</p>
   </div>
 
   <div class="section">
-     <button onclick="showCitizensData()">📄 ดูข้อมูลประชาชน</button>
-  <button onclick="showDeadCitizens()">☠️ ดูข้อมูลผู้เสียชีวิต</button>
+    <h3>📄 ข้อมูล &amp; รายงาน</h3>
+    <button onclick="showCitizensData()">📄 ดูข้อมูลประชาชน</button>
+    <button onclick="showDeadCitizens()">☠️ ดูข้อมูลผู้เสียชีวิต</button>
   </div>
-    <h3>จ้างข้าราชการ</h3>
-        
-      <button onclick="openResearchCenter()">🏛️ ศูนย์วิจัย</button>
-    <div class="button-grid">
-      <button onclick="hireCivilServant('park')">👨‍⚕️ ข้าราชการสวนสาธารณะ</button>
-      <button onclick="hireCivilServant('health')">👨‍⚕️ ข้าราชการสาธารณสุข</button>
-      <button onclick="hireCivilServant('police')">👮‍♂️ ข้าราชการตำรวจ</button>
-      <button onclick="hireCivilServant('infrastructure')">🛣️ ข้าราชการโครงสร้าง</button>
-      <button onclick="hireCivilServant('education')">👨‍🏫 ข้าราชการครู</button>
-      <button onclick="hireCivilServant('military')">🪖 ข้าราชการทหาร</button>
-      <button onclick="hireCivilServant('transport')">🚍 ข้าราชการขนส่ง</button>
-      <button onclick="hireCivilServant('scholarship')">👦💵 ข้าราชการทุน</button>
-            <button onclick="hireCivilServant('environment')">🚮♻️ ข้าราชด้านสิ่งแวดล้อม</button>
-      <button onclick="hireCivilServant('disaster')">🧑‍🚒 ข้าราชบรรเทาสาธารณภัย</button>
-      <button onclick="hireCivilServant('tourism')">👨‍✈️ ข้าราชการท่องเที่ยว</button>
-            <button onclick="hireCivilServant('technology')">🧑‍🔬 ข้าราชการวิจัย</button>
 
+  <!-- 🔹 ปุ่มลอยมุมขวาล่าง แสดงตลอดเวลา ไม่ต้องเลื่อนกลับขึ้นไปหา -->
+  <div id="quickDock" class="quick-dock">
+    <div class="dock-menu" id="dockMenu">
+      <button onclick="nextMonth()" title="เดือนถัดไป"><span>▶</span><small>เดือนถัดไป</small></button>
+      <button onclick="buyFood()" title="ซื้ออาหาร"><span>🍛</span><small>ซื้ออาหาร</small></button>
+      <button onclick="fundAll()" title="จ่ายงบทั้งหมด"><span>💰</span><small>จ่ายงบทั้งหมด</small></button>
+      <button onclick="document.getElementById('festivalBtn').click()" title="จัดเทศกาล"><span>🎉</span><small>เทศกาล</small></button>
+      <button onclick="openSaveManager()" title="เซฟเกม"><span>📂</span><small>เซฟเกม</small></button>
+      <button onclick="openResearchCenter()" title="ศูนย์วิจัย"><span>🏛️</span><small>วิจัย</small></button>
     </div>
+    <button id="dockToggle" class="dock-toggle" onclick="toggleDock()" title="เมนูลัด">⚡</button>
   </div>
 
 <script src="js/toast.js"></script>
@@ -108,7 +212,7 @@
 <script src="js/GlobalEconomy.js"></script>
 <script src="js/save.js"></script>
 <script src="js/Loan.js"></script>
-
+<script src="js/ui.js"></script>
 
 </body>
 </html>
