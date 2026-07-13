@@ -374,9 +374,7 @@ button, h1{ font-feature-settings: "kern"; }
   width:clamp(260px, 90vw, 980px);
   margin:0 auto 10px;
   padding:10px 14px;
-  background: rgba(20,25,34,.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(20,25,34,.97);
   border:1px solid rgba(255,255,255,.08);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
