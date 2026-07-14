@@ -36,6 +36,10 @@ function getGameState() {
     monthsSinceLastMajorDisaster,
     monthsSinceLastTourismBoom,
     monthsSinceLastTechBreakdown,
+    monthsInFamine,
+    taxMultiplier,
+    historyLog,
+    immigrationPolicy,
     // ถ้ามีตัวแปรอื่น ๆ ในไฟล์คุณ เพิ่มตรงนี้
   };
 }
@@ -87,6 +91,16 @@ function setGameState(state) {
   monthsSinceLastMajorDisaster = state.monthsSinceLastMajorDisaster ?? 999;
   monthsSinceLastTourismBoom = state.monthsSinceLastTourismBoom ?? 999;
   monthsSinceLastTechBreakdown = state.monthsSinceLastTechBreakdown ?? 999;
+  monthsInFamine = state.monthsInFamine ?? 0;
+  taxMultiplier = state.taxMultiplier || {
+    home:    { small: 1, large: 1 },
+    shop:    { small: 1, medium: 1, large: 1 },
+    factory: { small: 1, medium: 1, large: 1 }
+  };
+  // เซฟเก่าก่อนมีฟีเจอร์กราฟย้อนหลังจะไม่มี field นี้ ให้เริ่มเป็น array ว่างแทน
+  historyLog = Array.isArray(state.historyLog) ? state.historyLog : [];
+  // เซฟเก่าก่อนมีฟีเจอร์นโยบายตรวจคนเข้าเมืองจะไม่มี field นี้ ให้ใช้ "เปิดรับทุกคน" เป็นค่าเริ่มต้น (พฤติกรรมเดิม)
+  immigrationPolicy = state.immigrationPolicy || "open";
 }
 
 // เซฟเกม
@@ -108,6 +122,8 @@ function loadGame(slotName) {
 
   // 2. รีเฟรช UI
   updateInfo();
+  if (typeof refreshTaxSliders === "function") refreshTaxSliders();
+  if (typeof refreshImmigrationUI === "function") refreshImmigrationUI();
 
   // หมายเหตุ: เกมนี้เดินเดือนด้วยปุ่ม "เดือนถัดไป" ไม่มี auto-loop
   // (ของเดิมพยายามตั้ง setInterval(nextMonth, gameSpeed) แต่ gameSpeed

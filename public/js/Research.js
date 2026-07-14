@@ -99,7 +99,7 @@ function applyResearchEffects() {
                 researchEffects.happinessBonus = 3;
                 break;
             case "smart_grid":
-                researchEffects.factoryCostReduction = 0.90;
+                researchEffects.factoryCostReduction = 0.10; // แก้บั๊ก: เดิมใส่ 0.90 (ลด 90%) ทั้งที่คำอธิบายบอก -10% ทำให้โอพีเกินจริง
                 break;
             case "public_transport":
                 researchEffects.transportCrisisReduction = 0.5;
@@ -228,7 +228,7 @@ function finishResearch(id) {
             researchEffects.happinessBonus = 3;
             break;
         case "smart_grid":
-            researchEffects.factoryCostReduction = 0.90;
+            researchEffects.factoryCostReduction = 0.10;
             break;
         case "public_transport":
             researchEffects.transportCrisisReduction = 0.50;
@@ -251,7 +251,7 @@ function finishResearch(id) {
             researchEffects.taxIncomeBonus = 0.05;
             break;
         case "digital_market":
-            researchEffects.shopIncomeBonus2 = 0.05;
+            researchEffects.shopIncomeBonus2 = 0.04;
             break;
             
             // 🛡️ ป้องกันภัย

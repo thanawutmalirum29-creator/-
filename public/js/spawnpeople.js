@@ -172,7 +172,27 @@ function assignRandomJob() {
 }
 
 const _oldSpawnCitizen = spawnCitizen;
-spawnCitizen = function() {
+// 🛂 spawnCitizen() คือจุดที่ "ผู้อพยพใหม่" เข้าเมือง (ย้ายเข้าจากนอกเมือง) จึงเป็นจุดที่นโยบาย
+// ตรวจคนเข้าเมืองควรบังคับใช้ ต่างจาก spawnChildren() ที่เป็นเด็กเกิดจากประชาชนที่มีอยู่แล้ว
+// (การเกิดในเมือง ไม่ใช่การอพยพ) จึงไม่ถูกจำกัดโดยนโยบายนี้
+//
+// เรียกแบบ spawnCitizen({ bypassPolicy: true }) สำหรับกรณีที่ไม่ใช่การอพยพจริงๆ
+// เช่น ตอนตั้งค่าประชากรเริ่มเกม หรือระบบกันประชาชนย้ายออกพร้อมกันเยอะเกินไป (คนที่ตัดสินใจไม่ย้ายออก ไม่ใช่คนอพยพเข้าใหม่)
+spawnCitizen = function(options) {
+  options = options || {};
+  const bypassPolicy = options.bypassPolicy === true;
+
+  if (!bypassPolicy && typeof immigrationPolicy !== "undefined") {
+    if (immigrationPolicy === "closed") {
+      // 🚫 ปิดรับชั่วคราว: ไม่มีผู้อพยพใหม่เข้าเมืองเลย
+      return;
+    }
+    if (immigrationPolicy === "selective" && Math.random() < 0.45) {
+      // 🎓 รับเฉพาะมีความรู้ขั้นต่ำ: ผู้สมัครส่วนหนึ่งไม่ผ่านเกณฑ์ตรวจสอบ ทำให้โตช้าลง
+      return;
+    }
+  }
+
   const gender = Math.random() < 0.5 ? "M" : "W";
   const age = Math.floor(Math.random() * 35) + 1;
 
@@ -183,6 +203,15 @@ spawnCitizen = function() {
   else if (age <= 25) knowledge = Math.floor(Math.random() * 41) + 50;
   else if (age <= 30) knowledge = Math.floor(Math.random() * 11) + 90;
   else knowledge = Math.floor(Math.random() * 21) + 100;
+
+  // 🎓 นโยบาย "รับเฉพาะมีความรู้ขั้นต่ำ": ยกระดับความรู้ผู้อพยพที่ผ่านเกณฑ์ให้ไม่ต่ำกว่ามาตรฐานที่กำหนด
+  // (จำลองว่าด่านตรวจคนเข้าเมืองคัดเฉพาะผู้มีวุฒิ/ทักษะสูงพอเข้ามา)
+  if (!bypassPolicy && typeof immigrationPolicy !== "undefined" && immigrationPolicy === "selective") {
+    const minKnowledgeForSelective = 55;
+    if (knowledge < minKnowledgeForSelective) {
+      knowledge = minKnowledgeForSelective + Math.floor(Math.random() * 20);
+    }
+  }
 
   const id = generateCitizenID(gender);
 

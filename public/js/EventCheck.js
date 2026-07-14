@@ -3,6 +3,13 @@ function adjustImpactByHappiness(value) {
     return (happiness < 30) ? Math.floor(value / 2) : value;
 }
 
+// 🕊️ ช่วงเวลาปลอดภัยตอนเริ่มเกม: 4 เดือนแรก (หรือประชากรยังน้อยกว่า 25 คน) จะไม่มีเหตุการณ์ร้ายแรงเกิดขึ้น
+// ให้ผู้เล่นใหม่มีเวลาทำความเข้าใจระบบก่อนเจอวิกฤต (เหตุการณ์บวก/ข่าวลือ/สภาพอากาศยังทำงานตามปกติ)
+function isGracePeriod() {
+    const totalMonths = (yearCount - 1) * 12 + monthCount;
+    return totalMonths <= 4 || citizens.length < 25;
+}
+
 // ฟังก์ชันช่วยลดผลกระทบตามจำนวนข้าราชการ
 function adjustImpactByServants(value, count, max) {
     if (count >= Math.floor(max * 0.7)) {
@@ -13,6 +20,8 @@ function adjustImpactByServants(value, count, max) {
 
 function epidemicCheck() {
     monthsSinceLastEpidemic++;
+
+    if (isGracePeriod()) return;
 
     let doctorCount = civilServants.health || 0;
     let baseChance = 14; 
@@ -43,6 +52,8 @@ function epidemicCheck() {
 function riotCheck() {
     monthsSinceLastRiot++;
 
+    if (isGracePeriod()) return;
+
     let policeCount = civilServants.police || 0;
     let militaryCount = civilServants.military || 0; 
 
@@ -72,6 +83,8 @@ function riotCheck() {
 
 function infrastructureFailureCheck() {
     monthsSinceLastInfrastructureFailure++;
+
+    if (isGracePeriod()) return;
 
     let engineerCount = civilServants.infrastructure || 0;
     let transportCount = civilServants.transport || 0;
@@ -141,6 +154,8 @@ function repairStructure(name) {
 function warEventCheck() {
     monthsSinceLastWar++;
 
+    if (isGracePeriod()) return;
+
     let militaryCount = civilServants.military || 0;
     let baseChance = 6; // increased for balance
     let actualChance = Math.max(1, baseChance - (militaryCount * 1.5));
@@ -168,6 +183,8 @@ function warEventCheck() {
 
 function transportCrisisCheck() {
     monthsSinceLastTransportCrisis++;
+
+    if (isGracePeriod()) return;
 
     let transportCount = civilServants.transport || 0;
     let baseChance = 8;
@@ -197,6 +214,8 @@ function transportCrisisCheck() {
 function environmentEventCheck() {
     monthsSinceLastEnvDisaster++;
 
+    if (isGracePeriod()) return;
+
     let envCount = civilServants.environment || 0;
     let baseChance = 8; // ลดโอกาสพื้นฐาน
     let actualChance = Math.max(1, baseChance - (envCount * 1.5));
@@ -223,6 +242,8 @@ function environmentEventCheck() {
 
 function majorDisasterEventCheck() {
     monthsSinceLastMajorDisaster++;
+
+    if (isGracePeriod()) return;
 
     let reliefCount = civilServants.disaster || 0;
     let baseChance = 6; 
@@ -276,6 +297,8 @@ function tourismEventCheck() {
 
 function technologyEventCheck() {
     monthsSinceLastTechBreakdown++;
+
+    if (isGracePeriod()) return;
 
     let techCount = civilServants.technology || 0;
     let baseChance = 6;

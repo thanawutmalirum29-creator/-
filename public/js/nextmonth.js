@@ -23,14 +23,7 @@ function updateInfo() {
 
   let servantText = Object.entries(civilServants).map(([key, val]) => services[key] ? `👨‍💼 ${services[key].name}: ${val} คน` : "").join("<br>");
 
-  const maintenance = calculateMaintenanceCost();
-  // แปลงหน่วยเป็นบาท (กำหนดอัตราใหม่เพื่อความสมดุล)
-  let monthlyMaintenance = {
-    homeCost: maintenance.homeCost * (1000 * cityLevel),
-    shopCost: maintenance.shopCost * (3000 * cityLevel),
-    factoryCost: Math.ceil(maintenance.factoryCost * (8000 * cityLevel) * (1 - (researchEffects.factoryCostReduction || 0))),
-    total: (maintenance.homeCost * (1000 * cityLevel)) + (maintenance.shopCost * (3000 * cityLevel)) + Math.ceil(maintenance.factoryCost * (8000 * cityLevel) * (1 - (researchEffects.factoryCostReduction || 0)))
-  };
+  const monthlyMaintenance = getMonthlyMaintenance();
 
   let maintenanceText = `
     🏠 ดูแลบ้าน: ${monthlyMaintenance.homeCost.toLocaleString()} บาท<br>
@@ -40,13 +33,7 @@ function updateInfo() {
   `;
 
   const ageGroups = getAgeGroupStats();
-  let perPersonFood = 80 + Math.floor((happiness - 50) * 0.3); // ปรับเล็กน้อย
-
-  if (typeof currentSeasonName !== 'undefined' && currentSeasonName === "Summer" && researchEffects.summerFoodBonus) {
-    perPersonFood = Math.floor(perPersonFood * (1 - researchEffects.summerFoodBonus));
-  }
-  perPersonFood = Math.max(60, perPersonFood);
-  let foodNeededThisMonth = Math.ceil(citizens.length * perPersonFood);
+  let foodNeededThisMonth = getFoodNeeded();
 
   document.getElementById("info").innerHTML = `
     📅 เดือนที่: ${monthCount} | ปีที่: ${yearCount} | ฤดูกาล: ${currentSeasonName}<br>
@@ -77,7 +64,7 @@ function updateInfo() {
     💵 รายได้เดือนนี้:<br>
     🧾 รายได้ภาษี(เต็ม): ${collectTaxes().toLocaleString()} บาท<br>
     🍛 ความต้องการอาหารเดือนนี้: ${foodNeededThisMonth.toLocaleString()} มื้อ<br>
-    🍽️ อาหารคงเหลือ: ${foodStock.toLocaleString()} มื้อ<br>
+    🍽️ อาหารคงเหลือ: ${foodStock.toLocaleString()} มื้อ${monthsInFamine > 0 ? ` <span class="tag" style="color:var(--danger)">⚠️ ขาดแคลนต่อเนื่อง ${monthsInFamine}/3 เดือน</span>` : ""}<br>
     🛒 ซื้ออาหาร ${foodPurchasePerMonth.toLocaleString()} มื้อ (รวม ${Math.ceil(foodPurchasePerMonth * foodUnitCost).toLocaleString()} บาท)<br>
     🎪 จัดเทศกาล: ใช้เงิน ${(500000).toLocaleString()} บาท และอาหาร ${(30000).toLocaleString()} มื้อ (ความสุข +30~50)<br><br>
     🏠 บ้าน: ${homes.length} หลัง (เล็ก: ${smallHomes}, ใหญ่: ${largeHomes})<br>
@@ -126,18 +113,21 @@ let net = payLoanFromIncome(latestGrossIncome);
 latestNetIncome = net;
 addTreasury(net);
 
-  let maintenance = calculateMaintenanceCost();
-  let monthlyMaintenanceCost = Math.ceil(
-    maintenance.homeCost * (1000 * cityLevel) +
-    maintenance.shopCost * (3000 * cityLevel) +
-    Math.ceil(maintenance.factoryCost * (8000 * cityLevel) * (1 - (researchEffects.factoryCostReduction || 0)))
-  );
+  let monthlyMaintenanceCost = getMonthlyMaintenance().total;
   subtractTreasury(monthlyMaintenanceCost);
 
   payCivilServants(30, yearCount);
 
-  let welfare = Math.ceil((Math.max(0, 100 - happiness) / 100) * 50000); // ถ้าความสุขต่ำ ต้องจ่ายสวัสดิการสูงขึ้น
+  let welfare = Math.ceil((Math.max(0, 100 - happiness) / 100) * 40000); // ถ้าความสุขต่ำ ต้องจ่ายสวัสดิการสูงขึ้น (ลดเพดานจาก 50,000 ให้สมดุลกับรายจ่ายอื่นที่เพิ่มขึ้น)
   subtractTreasury(welfare);
+
+  // 🧾 ผลกระทบความสุขจากนโยบายภาษี: ขึ้นภาษีเกินมาตรฐานกระทบความสุขแรงกว่าลดภาษีที่ให้โบนัสเล็กน้อย (ไม่จูงใจให้ตั้งภาษีสูงสุดตลอด)
+  const taxDeviation = getTaxPolicyDeviation();
+  if (taxDeviation > 0) {
+    happiness = Math.max(0, happiness - Math.round(taxDeviation * 12));
+  } else if (taxDeviation < 0) {
+    happiness = Math.min(100, happiness + Math.round(-taxDeviation * 6));
+  }
 
   // พัฒนา (education)
   if (services.education.funded || civilServants.education >= services.education.requiredServants) {
@@ -145,13 +135,7 @@ addTreasury(net);
   }
 
   // คำนวณอาหารเดือนนี้
-let perPersonFood = 80 + Math.floor((happiness - 50) * 0.3);
-if (typeof currentSeasonName !== 'undefined' && currentSeasonName === "Summer" && researchEffects.summerFoodBonus) {
-  perPersonFood = Math.floor(perPersonFood * (1 - researchEffects.summerFoodBonus));
-}
-perPersonFood = Math.max(60, perPersonFood);
-
-const foodNeeded = Math.ceil(citizens.length * perPersonFood);
+const foodNeeded = getFoodNeeded();
 
 // ปรับราคาตามเศรษฐกิจ
 let economyFactor = (currentEconomy === 'Recession' ? 1.5 : (currentEconomy === 'Boom' ? 0.8 : 1));
@@ -160,10 +144,14 @@ let dynamicIncrement = foodPriceIncrement * economyFactor * (1 + scarcityRatio);
 foodUnitCost = Math.max(1, +(foodUnitCost + dynamicIncrement).toFixed(3));
 
 // หักอาหารและลดความสุขตามสัดส่วน
-foodStock -= foodNeeded; // ติดลบได้เลย
+foodStock -= foodNeeded;
 foodConsumedLastMonth = foodNeeded;
 
 if (foodStock < 0) {
+  // จำกัดไม่ให้ติดลบลึกเกินไปจนกู้คืนไม่ไหว (เดิมติดลบได้ไม่จำกัด ยิ่งเดือนถัดไปยิ่งขาดหนักเป็นทวีคูณ)
+  const famineFloor = -Math.max(2000, foodNeeded * 1.5);
+  if (foodStock < famineFloor) foodStock = famineFloor;
+
   const lacking = -foodStock; // จำนวนอาหารขาด
   const shortageRate = lacking / Math.max(1, foodNeeded);
   const happinessPenalty = Math.ceil(shortageRate * 20);
@@ -171,6 +159,13 @@ if (foodStock < 0) {
   // ลดความสุข
   happiness = Math.min(100, happiness + researchEffects.happinessBonus + researchEffects.monthlyHappinessIncrease);
   happiness = Math.max(0, happiness - happinessPenalty);
+
+  monthsInFamine++;
+  if (monthsInFamine === 2) {
+    toast(`🚨 ขาดแคลนอาหารต่อเนื่อง 2 เดือนแล้ว! หากไม่แก้ไขเดือนหน้าอาจถึงขั้นวิกฤต (ซื้ออาหารเพิ่มด่วน)`);
+  }
+} else {
+  monthsInFamine = 0;
 }
 
   updateLoanStatus();
@@ -210,6 +205,14 @@ if (fundAllBtn) {
   }
 
   // Events
+  // 🛡️ ระบบป้องกันความสุข/ประชากรดิ่งพร้อมกันหลายเหตุการณ์ในเดือนเดียว (เดิมแต่ละเหตุการณ์เช็คแยกกันอิสระ
+  // ถ้าโชคร้ายเกิดพร้อมกันหลายอย่าง ทั้งความสุขและจำนวนประชากรอาจร่วง/หายไปเกือบหมดในเดือนเดียว
+  // โดยผู้เล่นแทบไม่มีทางป้องกัน)
+  const happinessBeforeEvents = happiness;
+  const citizensBeforeEvents = citizens.length;
+  const MONTHLY_EVENT_LOSS_CAP = 35;
+  const MONTHLY_MIGRANT_LOSS_CAP = Math.max(3, Math.ceil(citizensBeforeEvents * 0.15));
+
   epidemicCheck();
   riotCheck();
   infrastructureFailureCheck();
@@ -221,6 +224,24 @@ if (fundAllBtn) {
   technologyEventCheck();
   monthlyWeatherEvent();
   positiveEventCheck();
+
+  {
+    const totalDrop = happinessBeforeEvents - happiness;
+    if (totalDrop > MONTHLY_EVENT_LOSS_CAP) {
+      const restored = totalDrop - MONTHLY_EVENT_LOSS_CAP;
+      happiness = Math.min(100, happiness + restored);
+      toast(`🛡️ มาตรการฉุกเฉินช่วยลดผลกระทบจากเหตุการณ์ซ้ำซ้อนในเดือนนี้ (คืนความสุข +${restored})`);
+    }
+
+    const migrantLoss = citizensBeforeEvents - citizens.length;
+    if (migrantLoss > MONTHLY_MIGRANT_LOSS_CAP) {
+      const toRestore = migrantLoss - MONTHLY_MIGRANT_LOSS_CAP;
+      // 🛂 นี่คือ "คนเดิมที่ตัดสินใจไม่ย้ายออก" ไม่ใช่ผู้อพยพใหม่ จึงไม่ผ่านการตรวจนโยบายตรวจคนเข้าเมือง
+      for (let i = 0; i < toRestore; i++) spawnCitizen({ bypassPolicy: true });
+      toast(`🛡️ ประชาชนบางส่วนตัดสินใจไม่ย้ายออกในนาทีสุดท้าย (${toRestore} คนกลับเข้าเมือง)`);
+    }
+  }
+
   showCitizensData();
   randomBuildMonthly();
   buildHomesIfNeeded();
@@ -255,5 +276,9 @@ if (researchEffects.monthlyHappinessIncrease) {
     happiness = Math.min(happinessCap, happiness + researchEffects.monthlyHappinessIncrease);
 }
 applyResearchEffects();
+
+  // 📈 บันทึกค่าสำคัญของเดือนนี้ลงประวัติ สำหรับกราฟย้อนหลังในแดชบอร์ด
+  recordHistorySnapshot();
+
   updateInfo();
 }

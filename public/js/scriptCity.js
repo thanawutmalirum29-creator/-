@@ -1,5 +1,7 @@
 applyResearchEffects();
-let taxRate = {
+
+// 🧾 อัตราภาษีพื้นฐาน (คำนวณอัตโนมัติตามจำนวนประชากร/งานวิจัย เหมือนเดิม)
+let baseTaxRate = {
   home: {
     get small() {
       return 12000 + Math.floor(citizens.length / 100) * 500 ;
@@ -32,19 +34,61 @@ let taxRate = {
   }
 };
 
+// 🎚️ ตัวคูณภาษีที่ผู้เล่นปรับเองได้ (1.0 = 100% มาตรฐาน, ปรับได้ 50%-150%)
+// แยกออกจาก baseTaxRate เพื่อให้ยังคงขยายตามประชากร/งานวิจัยอัตโนมัติ โดยผู้เล่นแค่ปรับ "ทิศทางนโยบาย" ทับไปอีกชั้น
+let taxMultiplier = {
+  home:    { small: 1, large: 1 },
+  shop:    { small: 1, medium: 1, large: 1 },
+  factory: { small: 1, medium: 1, large: 1 }
+};
+const TAX_MULTIPLIER_MIN = 0.5;
+const TAX_MULTIPLIER_MAX = 1.5;
+
+// อัตราภาษีจริงที่ใช้เก็บเงิน = พื้นฐาน × ตัวคูณของผู้เล่น (อินเตอร์เฟซหน้าตาเหมือนเดิมทุกจุดที่เรียกใช้)
+let taxRate = {
+  home: {
+    get small() { return Math.round(baseTaxRate.home.small * taxMultiplier.home.small); },
+    get large() { return Math.round(baseTaxRate.home.large * taxMultiplier.home.large); }
+  },
+  shop: {
+    get small()  { return Math.round(baseTaxRate.shop.small  * taxMultiplier.shop.small); },
+    get medium() { return Math.round(baseTaxRate.shop.medium * taxMultiplier.shop.medium); },
+    get large()  { return Math.round(baseTaxRate.shop.large  * taxMultiplier.shop.large); }
+  },
+  factory: {
+    get small()  { return Math.round(baseTaxRate.factory.small  * taxMultiplier.factory.small); },
+    get medium() { return Math.round(baseTaxRate.factory.medium * taxMultiplier.factory.medium); },
+    get large()  { return Math.round(baseTaxRate.factory.large  * taxMultiplier.factory.large); }
+  }
+};
+
+// ค่าเบี่ยงเบนเฉลี่ยของนโยบายภาษีทั้งหมด เทียบกับ 100% มาตรฐาน (ใช้คำนวณผลกระทบความสุขรายเดือน)
+function getTaxPolicyDeviation() {
+  const all = [
+    taxMultiplier.home.small, taxMultiplier.home.large,
+    taxMultiplier.shop.small, taxMultiplier.shop.medium, taxMultiplier.shop.large,
+    taxMultiplier.factory.small, taxMultiplier.factory.medium, taxMultiplier.factory.large
+  ];
+  const avg = all.reduce((a, b) => a + b, 0) / all.length;
+  return avg - 1; // ค่าบวก = ภาษีสูงกว่ามาตรฐานโดยรวม, ค่าลบ = ต่ำกว่ามาตรฐาน
+}
+
+// 💡 หมายเหตุบาลานซ์: เดิมตัวหารรวมของทั้ง 12 กระทรวงคิดเป็นราว 70% ของรายได้ภาษีรวมต่อเดือน
+// ทำให้แม้ผู้เล่นที่จ่ายงบครบทุกเดือนก็ยังล้มละลายภายใน 3-4 ปีเพราะเหลืองบดูแล/เงินเดือน/อาหารไม่พอ
+// ปรับตัวหารขึ้นราว 1.6 เท่า (คงสัดส่วนความสำคัญระหว่างกระทรวงเดิมไว้) ให้รวมกันเหลือราว 44% ของรายได้
 let services = {
-    park: { name: "สวนสาธารณะ", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/20) + civilServants.health * 15000 + (yearCount * 800), requiredServants: 1, maxServants: 5 },
-  health: { name: "สาธารณสุข", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/12) + civilServants.health * 15000 + (yearCount * 800), requiredServants: 1, maxServants: 5 },
-  police: { name: "ตำรวจ", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/18) + civilServants.police * 12000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
-  infrastructure: { name: "โครงสร้าง", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/14) + civilServants.infrastructure * 15000 + (yearCount * 700), requiredServants: 1, maxServants: 5 },
-  education: { name: "การศึกษา", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/14) + civilServants.education * 15000 + (yearCount * 900), requiredServants: 1, maxServants: 5 },
-  military: { name: "กลาโหม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/22) + civilServants.military * 12000 + (yearCount * 500), requiredServants: 1, maxServants: 5 },
-  transport: { name: "การขนส่ง", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/16) + civilServants.transport * 12000 + (yearCount * 650), requiredServants: 1, maxServants: 5 },
-  scholarship: { name: "ทุนการศึกษา", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/20) + civilServants.scholarship * 12000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
-  environment: { name: "สิ่งแวดล้อม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/20) + civilServants.environment * 12000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
-  disaster: { name: "สาธารณภัย", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/18) + civilServants.disaster * 12000 + (yearCount * 700), requiredServants: 1, maxServants: 5 },
-  tourism: { name: "การท่องเที่ยว", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/24) + civilServants.tourism * 10000 + (yearCount * 500), requiredServants: 1, maxServants: 5 },
-  technology: { name: "เทคโนโลยี", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/16) + civilServants.technology * 15000 + (yearCount * 900), requiredServants: 1, maxServants: 5 }
+    park: { name: "สวนสาธารณะ", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.park * 15000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
+  health: { name: "สาธารณสุข", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/19) + civilServants.health * 15000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
+  police: { name: "ตำรวจ", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/29) + civilServants.police * 12000 + (yearCount * 450), requiredServants: 1, maxServants: 5 },
+  infrastructure: { name: "โครงสร้าง", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/22) + civilServants.infrastructure * 15000 + (yearCount * 520), requiredServants: 1, maxServants: 5 },
+  education: { name: "การศึกษา", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/22) + civilServants.education * 15000 + (yearCount * 650), requiredServants: 1, maxServants: 5 },
+  military: { name: "กลาโหม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/35) + civilServants.military * 12000 + (yearCount * 380), requiredServants: 1, maxServants: 5 },
+  transport: { name: "การขนส่ง", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + civilServants.transport * 12000 + (yearCount * 480), requiredServants: 1, maxServants: 5 },
+  scholarship: { name: "ทุนการศึกษา", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.scholarship * 12000 + (yearCount * 440), requiredServants: 1, maxServants: 5 },
+  environment: { name: "สิ่งแวดล้อม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.environment * 12000 + (yearCount * 440), requiredServants: 1, maxServants: 5 },
+  disaster: { name: "สาธารณภัย", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/29) + civilServants.disaster * 12000 + (yearCount * 520), requiredServants: 1, maxServants: 5 },
+  tourism: { name: "การท่องเที่ยว", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/38) + civilServants.tourism * 10000 + (yearCount * 360), requiredServants: 1, maxServants: 5 },
+  technology: { name: "เทคโนโลยี", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + civilServants.technology * 15000 + (yearCount * 650), requiredServants: 1, maxServants: 5 }
 };
 
 let servantSalary = 450;
@@ -66,6 +110,39 @@ function calculateMaintenanceCost() {
   return { homeCost, shopCost, factoryCost, total };
 }
 
+// 💸 ค่าดูแลรายเดือนจริง (บาท) — ใช้ร่วมกันทั้งใน updateInfo() และ nextMonth()
+// เดิมตัวคูณโต "1000 * cityLevel" แบบเชิงเส้นตรง รวมกับจำนวนอาคารที่โตตามประชากรอยู่แล้ว
+// ทำให้ปลายเกม (เลเวลสูง) ค่าดูแลระเบิดเร็วกว่ารายได้มาก ปรับเป็นเส้นโค้งที่ชะลอตัวลง (sqrt)
+// เพื่อให้เมืองใหญ่ยังคงบริหารได้โดยไม่ล้มละลายอัตโนมัติ
+function getMaintenanceScale(level) {
+  return 900 * Math.sqrt(Math.max(1, level));
+}
+
+function getMonthlyMaintenance() {
+  const maintenance = calculateMaintenanceCost();
+  const scale = getMaintenanceScale(cityLevel);
+  const homeCost = Math.ceil(maintenance.homeCost * scale);
+  const shopCost = Math.ceil(maintenance.shopCost * scale * 2.6);
+  const factoryCost = Math.ceil(maintenance.factoryCost * scale * 6.4 * (1 - (researchEffects.factoryCostReduction || 0)));
+  return {
+    homeCost, shopCost, factoryCost,
+    total: homeCost + shopCost + factoryCost
+  };
+}
+
+// 🍛 อาหารที่ต้องการต่อคนต่อเดือน (ใช้ร่วมกันทุกจุดที่คำนวณ)
+function getPerPersonFood() {
+  let perPersonFood = 80 + Math.floor((happiness - 50) * 0.3);
+  if (typeof currentSeasonName !== 'undefined' && currentSeasonName === "Summer" && researchEffects.summerFoodBonus) {
+    perPersonFood = Math.floor(perPersonFood * (1 - researchEffects.summerFoodBonus));
+  }
+  return Math.max(60, perPersonFood);
+}
+
+function getFoodNeeded() {
+  return Math.ceil(citizens.length * getPerPersonFood());
+}
+
 function hireCivilServant(dept) {
   let max = services[dept].maxServants || services[dept].requiredServants;
 
@@ -84,7 +161,9 @@ function hireCivilServant(dept) {
 
 function payCivilServants(days = 30, yearCount = 1) {
   let totalServants = Object.values(civilServants).reduce((a, b) => a + b, 0);
-  let currentSalary = servantSalary * days + (yearCount - 1) * 5000;
+  // เดิม: เงินเดือนขึ้นทั้งจากปี (flat +5000/ปี) แล้วยังคูณซ้ำด้วย popFactor อีกชั้น ทำให้ปลายเกมพุ่งเร็วเกินไป
+  // ปรับใหม่: ให้ค่าครองชีพต่อปีโตช้าลง (2500/ปี) และให้ popFactor เป็นตัวขับหลักแทน (สะท้อนเมืองใหญ่ = ครองชีพแพงขึ้นจริง)
+  let currentSalary = servantSalary * days + (yearCount - 1) * 2500;
   let popFactor = Math.pow(Math.max(1, citizens.length / 100), 0.15);
   currentSalary = Math.ceil(currentSalary * popFactor);
   let totalCost = totalServants * currentSalary;
@@ -92,6 +171,8 @@ function payCivilServants(days = 30, yearCount = 1) {
   if (treasury >= totalCost) {
     subtractTreasury(totalCost);
   } else {
+    // จ่ายเท่าที่มี แทนที่จะไม่จ่ายเลย ลดผลกระทบให้สมเหตุสมผลกว่าเดิม
+    subtractTreasury(Math.max(0, treasury));
     happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - 5);
     toast("⚠️ ขาดเงินเดือนข้าราชการ ความสุขลดลง!");
@@ -179,14 +260,34 @@ function collectTaxes() {
 }
 
 function setTax(type, size) {
-  const val = parseInt(document.getElementById(`tax_${type}_${size}`).value);
-  if (!isNaN(val)) {
-    taxRate[type][size] = val;
-    updateInfo();
-  }
+  const input = document.getElementById(`tax_${type}_${size}`);
+  if (!input) return;
+  let percent = parseInt(input.value);
+  if (isNaN(percent)) return;
+
+  percent = Math.min(TAX_MULTIPLIER_MAX * 100, Math.max(TAX_MULTIPLIER_MIN * 100, percent));
+  taxMultiplier[type][size] = percent / 100;
+
+  const label = document.getElementById(`taxval_${type}_${size}`);
+  if (label) label.textContent = `${percent}% (${Math.round(baseTaxRate[type][size] * taxMultiplier[type][size]).toLocaleString()} บาท)`;
+
+  updateInfo();
 }
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// 🔄 ซิงก์ตำแหน่งสไลเดอร์ภาษีและป้ายตัวเลขให้ตรงกับ taxMultiplier ปัจจุบัน (เรียกตอนโหลดหน้า/โหลดเซฟ)
+function refreshTaxSliders() {
+  Object.keys(taxMultiplier).forEach(type => {
+    Object.keys(taxMultiplier[type]).forEach(size => {
+      const percent = Math.round(taxMultiplier[type][size] * 100);
+      const input = document.getElementById(`tax_${type}_${size}`);
+      const label = document.getElementById(`taxval_${type}_${size}`);
+      if (input) input.value = percent;
+      if (label) label.textContent = `${percent}% (${Math.round(baseTaxRate[type][size] * taxMultiplier[type][size]).toLocaleString()} บาท)`;
+    });
+  });
 }
 
 
@@ -213,8 +314,10 @@ function checkGameOver() {
     endGame("หนี้สินล้นพ้นตัว");
   } else if (happiness <= 0) {
     endGame("ความสุขตกถึงศูนย์");
-  }else if (foodStock <=-1) {
-    endGame("ผู้คนอดอยาก");
+  } else if (monthsInFamine >= 3) {
+    // เดิม: อาหารติดลบแม้แค่ 1 หน่วยเดือนเดียวก็จบเกมทันที ซึ่งโหดเกินไปและมักรู้สึกไม่แฟร์
+    // ใหม่: ต้องขาดแคลนอาหารต่อเนื่อง 3 เดือนติดถึงจะแพ้ ทำให้ผู้เล่นมีโอกาสแก้ไข (ซื้ออาหารเพิ่ม/ลดประชากร)
+    endGame("ผู้คนอดอยากต่อเนื่องหลายเดือน");
   }
 }
 
@@ -231,7 +334,9 @@ function buyFood() {
   toast(`✅ ซื้ออาหาร ${amount.toLocaleString()} มื้อ สำเร็จ! ใช้เงิน ${cost.toLocaleString()} บาท`);
   updateInfo();
 }
-for (let i = 0; i < 60; i++) spawnCitizen(); 
+// 🛂 ประชากรเริ่มต้นตอนสร้างเมือง ไม่ใช่ผู้อพยพระหว่างเล่นเกม จึงไม่ผ่านการตรวจนโยบายตรวจคนเข้าเมือง
+for (let i = 0; i < 60; i++) spawnCitizen({ bypassPolicy: true });
 buildHomesIfNeeded();
+refreshTaxSliders();
 updateInfo();
 setInterval(updateInfo, 1000);
