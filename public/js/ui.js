@@ -4,6 +4,12 @@
    =============================== */
 
 // ---------- แถบสถานะลอยด้านบน ----------
+// เก็บค่าล่าสุดที่เขียนลง DOM ไปแล้ว เพื่อ "เช็คก่อนเขียน" (dirty-check)
+// เดิมฟังก์ชันนี้เขียน DOM (textContent/classList) ทุก 1 วิ "เสมอ" แม้ค่าจะไม่เปลี่ยนเลย
+// (เกมส่วนใหญ่ค่าจะเปลี่ยนแค่ตอนเปลี่ยนเดือน ไม่ใช่ทุกวินาที) ทำให้เปลืองซีพียูฟรีๆ
+// และยิ่งแย่เพราะแถบนี้เป็น position:fixed ลอยอยู่ตลอด เขียนบ่อยๆ ระหว่างเลื่อนจอ
+// จะไปแย่งจังหวะ compositor กับการเลื่อน ทำให้แถบดูกระพริบ/หายวูบ ๆ บนมือถือบางรุ่น
+let _lastStatusBarSnapshot = "";
 function updateStatusBar() {
   try {
     const dateEl = document.getElementById("stat_date");
@@ -13,6 +19,23 @@ function updateStatusBar() {
     const popEl = document.getElementById("stat_population");
     const debtEl = document.getElementById("stat_debt");
     if (!dateEl) return;
+
+    // สร้างลายเซ็นของค่าปัจจุบันทั้งหมดแบบเบาๆ เทียบกับรอบก่อนหน้า
+    // ถ้าเหมือนเดิมทุกตัว ข้ามการเขียน DOM ทั้งหมดไปเลย
+    const snapshot = [
+      typeof monthCount !== "undefined" ? monthCount : "",
+      typeof yearCount !== "undefined" ? yearCount : "",
+      typeof currentSeasonName !== "undefined" ? currentSeasonName : "",
+      typeof treasury !== "undefined" ? treasury : "",
+      typeof happiness !== "undefined" ? happiness : "",
+      typeof foodStock !== "undefined" ? foodStock : "",
+      typeof citizens !== "undefined" ? citizens.length : "",
+      typeof loan !== "undefined" ? loan.remainingDebt : "",
+      typeof civilServants !== "undefined" ? JSON.stringify(civilServants) : ""
+    ].join("|");
+
+    if (snapshot === _lastStatusBarSnapshot) return;
+    _lastStatusBarSnapshot = snapshot;
 
     if (typeof monthCount !== "undefined") {
       const seasonText = (typeof currentSeasonName !== "undefined" && currentSeasonName) ? ` (${currentSeasonName})` : "";
@@ -106,8 +129,20 @@ document.addEventListener("DOMContentLoaded", () => {
   updateStatusBar();
 });
 
-// รีเฟรชแถบสถานะเรื่อยๆ เหมือนที่เกมหลักรีเฟรช #info ทุกวินาที
-setInterval(updateStatusBar, 1000);
+// ---------- รวมตัวจับเวลาให้เหลือลูปเดียว + หยุดเองเมื่อสลับไปแท็บอื่น ----------
+// เดิม updateStatusBar และ updateDashboardGauges ต่างฝ่ายต่าง setInterval(...,1000) ของตัวเอง
+// ทำงานทุกวินาทีตลอดเวลาแม้ผู้เล่นจะสลับไปแท็บ/แอปอื่น เปลืองซีพียู/แบตฟรีๆ
+// รวมเป็นตัวจับเวลาเดียว และข้ามการทำงานทั้งหมดเมื่อแท็บไม่ได้แสดงผลอยู่ (document.hidden)
+// พอกลับมาที่แท็บนี้ค่อยรีเฟรชให้ทันทีหนึ่งครั้ง
+function _uiTick() {
+  if (document.hidden) return;
+  updateStatusBar();
+  updateDashboardGauges();
+}
+setInterval(_uiTick, 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) _uiTick();
+});
 
 // ---------- แดชบอร์ดมาตรวัด (การ์ดพร้อมแถบความคืบหน้า) ----------
 function setGauge(prefix, valueText, subText, pct, state) {
@@ -127,9 +162,25 @@ function setGauge(prefix, valueText, subText, pct, state) {
   }
 }
 
+// เหมือน updateStatusBar ด้านบน: ข้ามการคำนวณ+เขียน DOM การ์ดมาตรวัดทั้ง 4 ใบ
+// ถ้าค่าดิบที่ใช้คำนวณยังเหมือนเดิมกับรอบก่อนหน้า (เกมส่วนใหญ่ค่าคงที่ตลอดทั้งเดือน)
+let _lastGaugeSnapshot = "";
 function updateDashboardGauges() {
   try {
     if (typeof treasury === "undefined") return;
+
+    const snapshot = [
+      treasury,
+      happiness,
+      foodStock,
+      typeof citizens !== "undefined" ? citizens.length : "",
+      typeof civilServants !== "undefined" ? JSON.stringify(civilServants) : "",
+      typeof homes !== "undefined" ? homes.length : "",
+      typeof foodConsumedLastMonth !== "undefined" ? foodConsumedLastMonth : "",
+      typeof monthsInFamine !== "undefined" ? monthsInFamine : ""
+    ].join("|");
+    if (snapshot === _lastGaugeSnapshot) return;
+    _lastGaugeSnapshot = snapshot;
 
     // 💰 คลังเมือง: แสดงเป็น "จำนวนเดือนที่อยู่รอดได้" ตามค่าดูแล/เงินเดือนโดยประมาณ
     let runwayMonths = 0;
@@ -192,4 +243,3 @@ function updateDashboardGauges() {
 document.addEventListener("DOMContentLoaded", () => {
   updateDashboardGauges();
 });
-setInterval(updateDashboardGauges, 1000);

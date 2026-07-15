@@ -451,4 +451,5 @@ for (let i = 0; i < 60; i++) spawnCitizen({ bypassPolicy: true });
 buildHomesIfNeeded();
 refreshTaxSliders();
 updateInfo();
-setInterval(updateInfo, 1000);
+// 🔕 หยุดรีเฟรชเมื่อสลับไปแท็บ/แอปอื่น (ประหยัดซีพียู/แบต) แล้วรีเฟรชทันทีเมื่อกลับมา
+setInterval(() => { if (!document.hidden) updateInfo(); }, 1000);
