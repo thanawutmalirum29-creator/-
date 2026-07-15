@@ -47,6 +47,10 @@ function startResearch(projectId) {
 
     toast(`🔬 เริ่มวิจัย "${project.name}" ใช้เวลา ${researchMonthsLeft} เดือน (ลดจาก ${project.time} เดือน ด้วยข้าราชการเทคโน ${techServants} คน)`);
     updateInfo();
+
+    // ปิด popup ทันทีหลังเริ่มวิจัยสำเร็จ กันสับสน (ของเดิมค้างหน้ารายการเดิมที่ตอนนี้ข้อมูลไม่ตรงแล้ว
+    // เช่น เงินคงคลังเปลี่ยน / มีงานวิจัยกำลังทำอยู่แล้ว)
+    closeModal();
 }
 
 // อัปเดตงานวิจัย (เรียกใน nextMonth)
@@ -148,27 +152,73 @@ let modalLevel = null;
 
 function openResearchCenter() {
     modalLevel = "root";
+
+    // นับจำนวนโครงการที่ยังไม่วิจัยในแต่ละหมวด เพื่อโชว์เป็นตัวเลขบนปุ่มหมวดหมู่
+    const countLeft = (cat) => researchProjects.filter(p => p.category === cat && !p.researched).length;
+
     let html = `<h2>🏛️ ศูนย์วิจัย</h2>
-    <p>เลือกหมวดหมู่เพื่อดูโครงการวิจัย:</p>
-    <button onclick="showResearchCategory('city')">🏙️ พัฒนาเมือง</button>
-    <button onclick="showResearchCategory('economy')">💰 เศรษฐกิจ</button>
-    <button onclick="showResearchCategory('defense')">🛡️ ป้องกันภัย</button>`;
+    <p class="research-hint">เลือกหมวดหมู่เพื่อดูโครงการวิจัยที่ยังไม่ได้ทำ:</p>
+    <div class="research-category-grid">
+      <button class="research-category-btn" onclick="showResearchCategory('city')">
+        <span class="research-category-icon">🏙️</span>
+        <span class="research-category-name">พัฒนาเมือง</span>
+        <span class="research-category-count">${countLeft('city')} รายการ</span>
+      </button>
+      <button class="research-category-btn" onclick="showResearchCategory('economy')">
+        <span class="research-category-icon">💰</span>
+        <span class="research-category-name">เศรษฐกิจ</span>
+        <span class="research-category-count">${countLeft('economy')} รายการ</span>
+      </button>
+      <button class="research-category-btn" onclick="showResearchCategory('defense')">
+        <span class="research-category-icon">🛡️</span>
+        <span class="research-category-name">ป้องกันภัย</span>
+        <span class="research-category-count">${countLeft('defense')} รายการ</span>
+      </button>
+    </div>`;
 
     showModal(html); // ฟังก์ชันนี้ไว้แสดง popup
 }
+
+// ชื่อ/ไอคอนหมวดหมู่ ใช้แสดงหัวข้อในหน้ารายการโครงการ
+const researchCategoryMeta = {
+    city:    { icon: "🏙️", name: "พัฒนาเมือง" },
+    economy: { icon: "💰", name: "เศรษฐกิจ" },
+    defense: { icon: "🛡️", name: "ป้องกันภัย" }
+};
+
 function showResearchCategory(category) {
     modalLevel = "category";
     let projects = researchProjects.filter(p => p.category === category && !p.researched);
+    const meta = researchCategoryMeta[category] || { icon: "🔬", name: "" };
 
     if (projects.length === 0) {
-        showModal(`<p>✅ ไม่มีโครงการในหมวดนี้ที่รอวิจัย</p>`);
+        showModal(`<h3>${meta.icon} ${meta.name}</h3><p class="research-empty">✅ ไม่มีโครงการในหมวดนี้ที่รอวิจัยแล้ว</p>`);
         return;
     }
 
-    let html = `<h3>โครงการวิจัยในหมวดนี้</h3>`;
+    // ถ้ามีงานวิจัยที่กำลังดำเนินการอยู่ ให้บอกให้ชัดเจนว่าทำไมกดวิจัยไม่ได้
+    const busyNotice = activeResearch
+        ? `<div class="research-busy-notice">⏳ กำลังวิจัย "${activeResearch.name}" อยู่ (เหลืออีก ${researchMonthsLeft} เดือน) — ต้องรอให้เสร็จก่อนเริ่มโครงการใหม่</div>`
+        : "";
+
+    let html = `<h3>${meta.icon} โครงการวิจัย: ${meta.name}</h3>${busyNotice}<div class="research-list">`;
     projects.forEach(p => {
-        html += `<p>${p.name} - ${p.effect} | ราคา ${p.cost.toLocaleString()} | <button onclick="startResearch('${p.id}')">วิจัย</button></p>`;
+        const disabled = (treasury < p.cost || !!activeResearch) ? "disabled" : "";
+        const affordClass = treasury < p.cost ? "research-item-price-low" : "";
+        html += `
+        <div class="research-item">
+          <div class="research-item-info">
+            <div class="research-item-name">${p.name}</div>
+            <div class="research-item-effect">✨ ${p.effect}</div>
+            <div class="research-item-time">⏱️ ใช้เวลา ${p.time} เดือน</div>
+          </div>
+          <div class="research-item-side">
+            <div class="research-item-price ${affordClass}">${p.cost.toLocaleString()} บาท</div>
+            <button class="research-item-btn" ${disabled} onclick="startResearch('${p.id}')">วิจัย</button>
+          </div>
+        </div>`;
     });
+    html += `</div>`;
 
     showModal(html);
 }

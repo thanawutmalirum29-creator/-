@@ -193,6 +193,12 @@ if (fundAllBtn) {
   fundAllBtn.classList.remove("funded");
 }
 
+// รีเซ็ตสถานะปุ่มลัดจ่ายงบทั้งหมดบนแถบเร่งด่วนด้วย ให้ตรงกับปุ่มปกติเสมอ
+let fundAllDockBtn = document.getElementById("fundAllDockBtn");
+if (fundAllDockBtn) {
+  fundAllDockBtn.classList.remove("funded");
+}
+
   if (happiness >= 60) {
     let base = Math.floor((happiness - 60) / 6);
     let randomBonus = Math.floor(Math.random() * 2);

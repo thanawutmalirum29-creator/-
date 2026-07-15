@@ -1,15 +1,52 @@
 function requestLoan() {
   const maxBorrow = Math.floor(collectTaxes() * 6);
-  let input = prompt(`💬 ต้องการกู้เงินเท่าไหร่? (กู้ได้สูงสุด ${maxBorrow.toLocaleString()} บาท):`);
-  let amount = parseInt(input);
+
+  // ป้องกัน closeModal() หลงเข้าใจว่ากำลังอยู่ในหน้าหมวดหมู่ของศูนย์วิจัย (modalLevel ค้างมาจากที่อื่น)
+  modalLevel = null;
+
+  const html = `
+    <h2>📥 กู้เงิน</h2>
+    <p class="loan-modal-hint">ต้องการกู้เงินเท่าไหร่? (กู้ได้สูงสุด <strong>${maxBorrow.toLocaleString()} บาท</strong>)</p>
+    <input
+      type="number"
+      id="loanAmountInput"
+      class="loan-modal-input"
+      placeholder="ใส่จำนวนเงิน (บาท)"
+      min="1"
+      max="${maxBorrow}"
+      inputmode="numeric"
+      onkeydown="if(event.key==='Enter'){confirmLoanRequest(${maxBorrow});}"
+    >
+    <div class="loan-modal-actions">
+      <button class="loan-modal-confirm" onclick="confirmLoanRequest(${maxBorrow})">✅ ยืนยันกู้เงิน</button>
+    </div>
+  `;
+
+  showModal(html);
+
+  // โฟกัสช่องกรอกให้อัตโนมัติ พิมพ์ตัวเลขได้ทันทีโดยไม่ต้องแตะก่อน
+  setTimeout(() => {
+    const input = document.getElementById("loanAmountInput");
+    if (input) input.focus();
+  }, 60);
+}
+
+function confirmLoanRequest(maxBorrow) {
+  const input = document.getElementById("loanAmountInput");
+  const amount = parseInt(input && input.value, 10);
 
   if (isNaN(amount) || amount <= 0) {
     toast("❌ ใส่จำนวนที่ถูกต้อง!");
     return;
   }
+  if (amount > maxBorrow) {
+    toast(`⚠️ กู้ได้สูงสุด ${maxBorrow.toLocaleString()} บาท ตามความสามารถรัฐ.`);
+    return;
+  }
 
   borrowMoney(amount);
   updateLoanStatus();
+  closeModal();
 }
 
 function borrowMoney(amount) {

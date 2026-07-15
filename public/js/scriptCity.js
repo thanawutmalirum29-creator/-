@@ -220,6 +220,10 @@ function fundAll() {
   let fundAllBtn = document.getElementById("fundAllBtn");
   if (fundAllBtn) fundAllBtn.classList.add("funded");
 
+  // 🔁 ซิงก์สถานะ "ติ๊กแล้ว" ไปยังปุ่มลัดจ่ายงบทั้งหมดบนแถบเร่งด่วนด้วย ให้ตรงกับปุ่มปกติเสมอ
+  let fundAllDockBtn = document.getElementById("fundAllDockBtn");
+  if (fundAllDockBtn) fundAllDockBtn.classList.add("funded");
+
   if (paid.length > 0) {
     toast(`✅ จ่ายงบให้ทั้งหมด: ${paid.join(", ")}`);
   }
@@ -277,6 +281,18 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// 🔘 ปรับภาษีทีละ 5% ผ่านปุ่ม － / ＋ แม่นยำกว่าการลากแถบเลื่อนบนจอสัมผัส
+function adjustTax(type, size, delta) {
+  const input = document.getElementById(`tax_${type}_${size}`);
+  if (!input) return;
+  const min = parseInt(input.min, 10);
+  const max = parseInt(input.max, 10);
+  let next = parseInt(input.value, 10) + delta;
+  next = Math.min(max, Math.max(min, next));
+  input.value = next;
+  setTax(type, size);
+}
+
 // 🔄 ซิงก์ตำแหน่งสไลเดอร์ภาษีและป้ายตัวเลขให้ตรงกับ taxMultiplier ปัจจุบัน (เรียกตอนโหลดหน้า/โหลดเซฟ)
 function refreshTaxSliders() {
   Object.keys(taxMultiplier).forEach(type => {
@@ -322,7 +338,102 @@ function checkGameOver() {
 }
 
 function buyFood() {
-  const amount = 20000;
+  // เผื่อ modalLevel ค้างจากศูนย์วิจัยหน้าอื่น ให้รีเซ็ตก่อนเปิดป๊อปอัปเสมอ
+  if (typeof modalLevel !== "undefined") modalLevel = null;
+
+  const defaultAmount = 20000;
+  const html = `
+    <h2>🍛 ซื้ออาหาร</h2>
+    <p>ปรับจำนวนอาหารที่ต้องการซื้อ แล้วกดยืนยัน:</p>
+
+    <div class="buyfood-qty-row">
+      <button type="button" class="tax-step" onclick="adjustFoodPurchase(-5000)" aria-label="ลดจำนวน 5,000 มื้อ">－</button>
+      <input type="number" id="foodPurchaseInput" value="${defaultAmount}" min="1000" step="1000" oninput="updateFoodPurchaseDisplay()">
+      <button type="button" class="tax-step" onclick="adjustFoodPurchase(5000)" aria-label="เพิ่มจำนวน 5,000 มื้อ">＋</button>
+    </div>
+
+    <div class="buyfood-preset-row">
+      <button type="button" onclick="setFoodPurchasePreset(10000)">10,000 มื้อ</button>
+      <button type="button" onclick="setFoodPurchasePreset(20000)">20,000 มื้อ</button>
+      <button type="button" onclick="setFoodPurchasePreset(50000)">50,000 มื้อ</button>
+      <button type="button" onclick="setFoodPurchasePreset(100000)">100,000 มื้อ</button>
+    </div>
+
+    <div class="confirm-cost-grid">
+      <div class="confirm-cost-row"><span>💵 ราคาต่อหน่วย</span><span id="foodUnitPriceText">-</span></div>
+      <div class="confirm-cost-row"><span>🧾 ราคารวม</span><span id="foodTotalPriceText">-</span></div>
+      <div class="confirm-cost-row"><span>💰 เงินคงคลังหลังซื้อ</span><span id="foodTreasuryAfterText">-</span></div>
+      <div class="confirm-cost-row"><span>🍽️ อาหารคงคลังหลังซื้อ</span><span id="foodStockAfterText">-</span></div>
+    </div>
+    <p class="confirm-warn" id="foodWarnText" style="display:none;"></p>
+
+    <div class="confirm-btn-row">
+      <button type="button" class="confirm-proceed-btn" onclick="confirmBuyFood()">✅ ยืนยันซื้ออาหาร</button>
+    </div>
+  `;
+
+  showModal(html);
+  updateFoodPurchaseDisplay();
+}
+
+// ปุ่ม － / ＋ ปรับจำนวนซื้อทีละ 5,000 มื้อ
+function adjustFoodPurchase(delta) {
+  const input = document.getElementById("foodPurchaseInput");
+  if (!input) return;
+  let next = (parseInt(input.value, 10) || 0) + delta;
+  if (next < 1000) next = 1000;
+  input.value = next;
+  updateFoodPurchaseDisplay();
+}
+
+// ปุ่มลัดจำนวนที่ซื้อบ่อย
+function setFoodPurchasePreset(amount) {
+  const input = document.getElementById("foodPurchaseInput");
+  if (!input) return;
+  input.value = amount;
+  updateFoodPurchaseDisplay();
+}
+
+// อัปเดตราคาต่อหน่วย/ราคารวม/ยอดคงเหลือแบบเรียลไทม์ตามจำนวนที่พิมพ์หรือกดปรับ
+function updateFoodPurchaseDisplay() {
+  const input = document.getElementById("foodPurchaseInput");
+  if (!input) return;
+
+  let amount = parseInt(input.value, 10);
+  if (isNaN(amount) || amount < 1000) amount = 1000;
+
+  const unitCost = foodUnitCost;
+  const total = Math.ceil(amount * unitCost);
+  const treasuryAfter = Math.ceil(treasury - total);
+  const foodAfter = Math.ceil(foodStock + amount);
+
+  const unitEl = document.getElementById("foodUnitPriceText");
+  const totalEl = document.getElementById("foodTotalPriceText");
+  const treasuryEl = document.getElementById("foodTreasuryAfterText");
+  const stockEl = document.getElementById("foodStockAfterText");
+  const warnEl = document.getElementById("foodWarnText");
+
+  if (unitEl) unitEl.textContent = `${unitCost.toLocaleString()} บาท/มื้อ`;
+  if (totalEl) totalEl.innerHTML = `<b>${total.toLocaleString()}</b> บาท`;
+  if (treasuryEl) treasuryEl.innerHTML = `${treasury.toLocaleString()} → <b>${treasuryAfter.toLocaleString()}</b> บาท`;
+  if (stockEl) stockEl.innerHTML = `${foodStock.toLocaleString()} → <b>${foodAfter.toLocaleString()}</b> มื้อ`;
+
+  if (warnEl) {
+    if (treasuryAfter < 0) {
+      warnEl.style.display = "";
+      warnEl.textContent = `⚠️ เงินคงคลังจะติดลบเหลือ ${treasuryAfter.toLocaleString()} บาท`;
+    } else {
+      warnEl.style.display = "none";
+    }
+  }
+}
+
+// กดยืนยันในป๊อปอัปแล้วค่อยหักเงิน/เพิ่มอาหารจริง
+function confirmBuyFood() {
+  const input = document.getElementById("foodPurchaseInput");
+  let amount = input ? parseInt(input.value, 10) : 20000;
+  if (isNaN(amount) || amount < 1000) amount = 1000;
+
   const cost = Math.ceil(amount * foodUnitCost);
 
   // 💸 หักเงินได้เสมอ แม้ติดลบ
@@ -331,6 +442,7 @@ function buyFood() {
   // 🍚 เพิ่มอาหาร
   foodStock += amount;
 
+  closeModal();
   toast(`✅ ซื้ออาหาร ${amount.toLocaleString()} มื้อ สำเร็จ! ใช้เงิน ${cost.toLocaleString()} บาท`);
   updateInfo();
 }
