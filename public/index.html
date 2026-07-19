@@ -64,20 +64,6 @@
     </div>
   </div>
 
-  <!-- 🔹 การกระทำหลักที่ใช้บ่อยที่สุด อยู่บนสุดเสมอ -->
-  <div class="section quick-actions">
-    <h3>⚡ การกระทำหลัก</h3>
-    <div class="quick-actions-row">
-      <button class="primary-action" onclick="nextMonth()">▶ เดือนถัดไป</button>
-      <button id="festivalBtn">🎉 จัดเทศกาล</button>
-      <button onclick="buyFood()">🍛 ซื้ออาหาร</button>
-      <button onclick="openHistoryChart()">📈 กราฟย้อนหลัง</button>
-      <button onclick="requestLoan()">📥 กู้เงิน</button>
-      <button onclick="openResearchCenter()">🏛️ ศูนย์วิจัย</button>
-      <button onclick="openSaveManager()">📂 เซฟเกม</button>
-    </div>
-  </div>
-
   <!-- 🔸 หน้าต่างจัดการเซฟ -->
   <div id="saveManager" class="modal-overlay" style="display:none;">
     <div class="modal-box">
@@ -211,16 +197,35 @@
     </div>
   </div>
 
-  <!-- 🔹 นโยบายตรวจคนเข้าเมือง: เลือกเกณฑ์รับผู้อพยพเข้าเมือง 3 แบบ -->
-  <div class="section" id="immigrationSection">
-    <h3>🛂 นโยบายตรวจคนเข้าเมือง</h3>
-    <p class="tax-hint">เลือกเกณฑ์การรับผู้อพยพใหม่เข้าเมือง แต่ละนโยบายแลกกันระหว่างความเร็วในการเติบโตกับคุณภาพของประชากร</p>
-    <div class="immig-btn-row">
-      <button id="immigBtn_open" class="immig-btn" onclick="setImmigrationPolicy('open')" title="ประชากรโตเร็ว ความรู้เฉลี่ยต่ำ">🌍 เปิดรับทุกคน</button>
-      <button id="immigBtn_selective" class="immig-btn" onclick="setImmigrationPolicy('selective')" title="โตช้าลง แต่คุณภาพสูงขึ้น">🎓 รับเฉพาะมีความรู้ขั้นต่ำ</button>
-      <button id="immigBtn_closed" class="immig-btn" onclick="setImmigrationPolicy('closed')" title="คุมประชากรตอนเมืองแออัด">🚫 ปิดรับชั่วคราว</button>
+  <!-- 🔹 พยากรณ์การคลัง: สรุปกระแสเงินสดเดือนนี้ให้เห็นก่อนตัดสินใจจ่ายงบ/ปรับภาษี -->
+  <div class="section" id="fiscalForecastSection">
+    <h3>📊 พยากรณ์การคลัง</h3>
+    <p class="tax-hint">ประมาณการถ้าจ่ายงบครบทุกกระทรวงเดือนนี้ ใช้ดูก่อนตัดสินใจว่าจะปรับภาษี/งดจ่ายบางกระทรวงหรือไม่</p>
+    <div class="fiscal-grid">
+      <div class="fiscal-item">
+        <span class="fiscal-label">💵 กระแสเงินสดสุทธิ (ถ้าจ่ายงบครบ)</span>
+        <span class="fiscal-value" id="fiscal_net">-</span>
+      </div>
+      <div class="fiscal-item">
+        <span class="fiscal-label">🧾 การใช้เพดานภาษี</span>
+        <span class="fiscal-value" id="fiscal_capuse">-</span>
+      </div>
+      <div class="fiscal-item">
+        <span class="fiscal-label">🌍 เศรษฐกิจโลกปีนี้</span>
+        <span class="fiscal-value" id="fiscal_economy">-</span>
+      </div>
+      <div class="fiscal-item">
+        <span class="fiscal-label">🔮 พยากรณ์ปีหน้า</span>
+        <span class="fiscal-value" id="fiscal_economy_forecast">-</span>
+      </div>
     </div>
-    <p class="immig-desc" id="immigrationDesc">-</p>
+  </div>
+
+  <!-- 🔹 โครงสร้างเสียหาย: ซ่อนไว้ถ้าไม่มีของเสียหาย โผล่มาพร้อมปุ่มซ่อมเมื่อมีภัยพิบัติ/อุบัติเหตุเกิดขึ้น -->
+  <div class="section" id="repairSection" style="display:none">
+    <h3>🚧 โครงสร้างเสียหาย ต้องซ่อมแซม</h3>
+    <p class="tax-hint">โครงสร้างที่เสียหายจะฉุดรายได้ภาษีของบ้าน/ร้านค้า/โรงงานที่เกี่ยวข้องไปเรื่อยๆ จนกว่าจะซ่อม — ปล่อยไว้นานยิ่งเสียรายได้สะสมมาก</p>
+    <div class="repair-grid" id="repairGrid"></div>
   </div>
 
   <!-- 🔹 งบประมาณ + จ้างข้าราชการ รวมเป็นการ์ดต่อกระทรวงเดียวกัน พร้อมค้นหา -->
@@ -341,28 +346,26 @@
 
   </div><!-- /.app-shell -->
 
-  <!-- 🔹 ปุ่มลอยมุมขวาล่าง แสดงตลอดเวลา ไม่ต้องเลื่อนกลับขึ้นไปหา -->
-  <div id="quickDock" class="quick-dock">
-    <div class="dock-menu" id="dockMenu">
-      <button onclick="nextMonth()" title="เดือนถัดไป"><span>▶</span><small>เดือนถัดไป</small></button>
-      <button onclick="buyFood()" title="ซื้ออาหาร"><span>🍛</span><small>ซื้ออาหาร</small></button>
-      <button id="fundAllDockBtn" onclick="fundAll()" title="จ่ายงบทั้งหมด"><span>💰</span><small>จ่ายงบทั้งหมด</small></button>
-      <button onclick="document.getElementById('festivalBtn').click()" title="จัดเทศกาล"><span>🎉</span><small>เทศกาล</small></button>
-      <button onclick="openSaveManager()" title="เซฟเกม"><span>📂</span><small>เซฟเกม</small></button>
-      <button onclick="openResearchCenter()" title="ศูนย์วิจัย"><span>🏛️</span><small>วิจัย</small></button>
-      <button onclick="openHistoryChart()" title="กราฟย้อนหลัง"><span>📈</span><small>กราฟ</small></button>
-      <button onclick="showCitizensData()" title="ข้อมูลประชาชน"><span>📄</span><small>ข้อมูลประชาชน</small></button>
-      <button onclick="showDeadCitizens()" title="ข้อมูลผู้เสียชีวิต"><span>☠️</span><small>ผู้เสียชีวิต</small></button>
-      <button onclick="showGameGuide()" title="วิธีเล่น"><span>📖</span><small>วิธีเล่น</small></button>
-    </div>
-    <div class="dock-toggle-wrap">
-      <span id="dockHint" class="dock-hint">👆 เมนูลัด</span>
-      <button id="dockToggle" class="dock-toggle" onclick="toggleDock()" title="เมนูลัด">⚡</button>
-    </div>
+  <!-- 🔹 แถบเมนูลัดลอยติดด้านล่างสุด แสดงตลอดเวลาเหมือนแถบสถานะด้านบน (ไม่ต้องกดปุ่ม ⚡ เพื่อเปิดอีกต่อไป)
+       เลื่อนแนวนอนได้ถ้าปุ่มเยอะกว่าความกว้างจอ -->
+  <div id="quickBar" class="quick-bar">
+    <button class="quick-bar-btn primary-action" onclick="nextMonth()" title="เดือนถัดไป"><span>▶</span><small>เดือนถัดไป</small></button>
+    <button id="festivalBtn" class="quick-bar-btn" title="จัดเทศกาล"><span>🎉</span><small>เทศกาล</small></button>
+    <button class="quick-bar-btn" onclick="buyFood()" title="ซื้ออาหาร"><span>🍛</span><small>ซื้ออาหาร</small></button>
+    <button id="fundAllDockBtn" class="quick-bar-btn" onclick="fundAll()" title="จ่ายงบทั้งหมด"><span>💰</span><small>จ่ายงบ</small></button>
+    <button class="quick-bar-btn" onclick="requestLoan()" title="กู้เงิน"><span>📥</span><small>กู้เงิน</small></button>
+    <button class="quick-bar-btn" onclick="openResearchCenter()" title="ศูนย์วิจัย"><span>🏛️</span><small>วิจัย</small></button>
+    <button class="quick-bar-btn immig-quick-btn" onclick="openImmigrationCenter()" title="นโยบายตรวจคนเข้าเมือง"><span>🛂</span><small>คนเข้าเมือง</small></button>
+    <button class="quick-bar-btn" onclick="openHistoryChart()" title="กราฟย้อนหลัง"><span>📈</span><small>กราฟ</small></button>
+    <button class="quick-bar-btn" onclick="showCitizensData()" title="ข้อมูลประชาชน"><span>📄</span><small>ประชาชน</small></button>
+    <button class="quick-bar-btn" onclick="showDeadCitizens()" title="ข้อมูลผู้เสียชีวิต"><span>☠️</span><small>ผู้เสียชีวิต</small></button>
+    <button class="quick-bar-btn" onclick="openSaveManager()" title="เซฟเกม"><span>📂</span><small>เซฟเกม</small></button>
+    <button class="quick-bar-btn" onclick="showGameGuide()" title="วิธีเล่น"><span>📖</span><small>วิธีเล่น</small></button>
   </div>
 
 <script src="js/toast.js"></script>
 <script src="js/statusBarLayout.js"></script>
+<script src="js/quickBarLayout.js"></script>
 <script src="js/theme.js"></script>
 <script src="js/showGameGuide.js"></script>
 <script src="js/Global.js"></script>
@@ -385,6 +388,7 @@
 <script src="js/monthlyRumorEvent.js"></script>
 <script src="js/monthlyWeatherEvent.js"></script>
 <script src="js/EventCheck.js"></script>
+<script src="js/CrisisEvent.js"></script>
 <script src="js/GlobalEconomy.js"></script>
 <script src="js/save.js"></script>
 <script src="js/Loan.js"></script>

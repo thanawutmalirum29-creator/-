@@ -79,6 +79,7 @@ html, body{ overflow-x: hidden; }
   margin: 0 auto;
   padding: 18px 14px 90px;
   padding-top: calc(var(--status-bar-h, 64px) + 18px + env(safe-area-inset-top));
+  padding-bottom: calc(var(--quick-bar-h, 90px) + 18px + env(safe-area-inset-bottom));
 }
 
 .app-header{
@@ -195,8 +196,7 @@ button:focus-visible{
   outline-offset:2px;
 }
 
-/* Quick actions row */
-.quick-actions-row{ display:flex; flex-wrap:wrap; gap:10px; }
+/* Primary/festival button color accents (now used inside the persistent bottom quick bar) */
 .primary-action{
   background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important;
   color:#ffffff !important;
@@ -747,103 +747,48 @@ button[title]:hover::after{
 }
 
 /* ================================
-   ปุ่มลอยด่วน (Floating Quick Dock)
+   แถบเมนูลัดลอยติดด้านล่างสุด (Persistent Bottom Quick Bar)
+   เดิมเป็นปุ่ม ⚡ ลอยมุมขวาล่างที่ต้องกดเปิดก่อนถึงจะเห็นเมนู เปลี่ยนเป็นแถบยาวที่แสดง
+   ตลอดเวลาเหมือน #statusBar ด้านบน (ปุ่มเยอะกว่าจะพอดีจอ จึงเลื่อนแนวนอนได้แทนการพับซ่อน)
    ================================ */
-.quick-dock{
-  position:fixed;
-  right:18px;
-  bottom:18px;
-  z-index:1900;
+.quick-bar{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1900;
   display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:10px;
-  /* กันจอกระตุกตอนเลื่อน: บอกเบราว์เซอร์ล่วงหน้าให้แยกเลเยอร์ compositor ของปุ่มลอยนี้ไว้ต่างหาก */
+  align-items:center;
+  gap:8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,.97);
+  border-top: 1px solid var(--border-strong);
+  box-shadow: 0 -10px 26px rgba(30,25,10,.10);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  /* กันจอกระตุกตอนเลื่อน: บอกเบราว์เซอร์ล่วงหน้าให้แยกเลเยอร์ compositor ของแถบลอยนี้ไว้ต่างหาก */
   will-change: transform;
   transform: translateZ(0);
 }
-.dock-toggle{
-  width:58px;
-  height:58px;
-  border-radius:50%;
-  font-size:23px;
-  background: linear-gradient(145deg, var(--accent), var(--accent-strong)) !important;
-  color:#ffffff !important;
-  border: none !important;
-  box-shadow: 0 10px 24px rgba(15,168,154,.32);
-}
-.dock-menu{
+.quick-bar::-webkit-scrollbar{ height:6px; }
+.quick-bar-btn{
+  flex: 0 0 auto;
   display:flex;
   flex-direction:column;
-  gap:8px;
-  align-items:flex-end;
-  max-height:0;
-  overflow:hidden;
-  opacity:0;
-  transform: translateY(8px);
-  transition: max-height .2s ease, opacity .2s ease, transform .2s ease;
-}
-.quick-dock.open .dock-menu{
-  max-height:420px;
-  opacity:1;
-  transform: translateY(0);
-}
-.dock-menu button{
-  display:flex;
   align-items:center;
-  gap:8px;
-  padding:9px 16px;
-  border-radius:var(--radius-pill);
-  font-size:13px;
+  justify-content:center;
+  gap:3px;
+  min-width:62px;
+  padding:8px 10px;
+  border-radius: var(--radius-sm);
+  font-size:11px;
   white-space:nowrap;
   background: var(--card);
-  box-shadow: 0 6px 16px rgba(30,25,10,.18);
 }
-.dock-menu button span{ font-size:16px; }
-/* คำใบ้ "เมนูลัด" — โชว์แค่ตอนยังไม่เคยกดเปิดปุ่มลัด
-   เดิมตำแหน่งอ้างอิงจากขอบล่างของ .quick-dock ทั้งกล่อง ซึ่งความสูงจะเปลี่ยนไปเวลาเมนูกางออก
-   (มีปุ่มเรียงซ้อนกันหลายปุ่ม) ทำให้คำใบ้เด้งไปคนละตำแหน่งและไปทับปุ่มเมนูพอดี
-   แก้โดยย้าย .dock-hint เข้ามาอยู่ใน .dock-toggle-wrap เดียวกับปุ่ม ⚡ โดยเฉพาะ
-   ตำแหน่งจึงอ้างอิงกับปุ่มลัดตรงๆ เสมอ ไม่ขยับหนีไปไหนไม่ว่าเมนูจะเปิดหรือปิด */
-.dock-toggle-wrap{
-  position:relative;
-  display:flex;
-  align-items:center;
-}
-.dock-hint{
-  position:absolute;
-  right: calc(100% + 12px);
-  top:50%;
-  transform: translateY(-50%);
-  background: linear-gradient(180deg, var(--card), var(--card-2));
-  color: var(--text);
-  border:1px solid var(--border-strong);
-  padding:7px 13px;
-  border-radius:var(--radius-pill);
-  font-size:12.5px;
-  font-weight:700;
-  white-space:nowrap;
-  box-shadow: var(--shadow);
-  pointer-events:none;
-  animation: dockHintBob 1.6s ease-in-out infinite;
-}
-/* กันไว้อีกชั้น: ถ้าเมนูลัดกางออกอยู่ ไม่ต้องโชว์คำใบ้นี้เด็ดขาด ไม่ว่ากรณีใด */
-.quick-dock.open .dock-hint{ display:none; }
-.dock-hint::after{
-  content:"";
-  position:absolute;
-  right:-6px;
-  top:50%;
-  width:10px; height:10px;
-  transform: translateY(-50%) rotate(45deg);
-  background: var(--card-2);
-  border-right:1px solid var(--border-strong);
-  border-bottom:1px solid var(--border-strong);
-}
-@keyframes dockHintBob{
-  0%,100%{ transform: translateX(0); }
-  50%{ transform: translateX(-4px); }
-}
+.quick-bar-btn span{ font-size:18px; line-height:1; }
+.quick-bar-btn small{ font-size:10.5px; font-weight:700; color: inherit; opacity:.8; }
 
 /* ================================
    ศูนย์วิจัย (Research Center popup)
@@ -1100,9 +1045,11 @@ input[type="range"]:focus-visible{
 
 @media (max-width:480px){
   .status-bar{ font-size:12px; gap:6px; }
-  .quick-dock{ right:12px; bottom:12px; }
+  .quick-bar{ gap:6px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .quick-bar-btn{ min-width:56px; padding:7px 8px; font-size:10px; }
   .app-shell{ padding: 12px 8px 90px; }
   .app-shell{ padding-top: calc(var(--status-bar-h, 96px) + 12px + env(safe-area-inset-top)); }
+  .app-shell{ padding-bottom: calc(var(--quick-bar-h, 84px) + 12px + env(safe-area-inset-bottom)); }
   h1{ padding:14px 16px; }
 }
 
@@ -1200,4 +1147,144 @@ input[type="range"]:focus-visible{
   border-left:3px solid var(--accent);
   border-radius: var(--radius-sm);
   padding:10px 12px;
+}
+
+/* ================================
+   🛂 นโยบายตรวจคนเข้าเมือง (popup)
+   ================================ */
+.immig-policy-grid{
+  display:grid;
+  grid-template-columns: repeat(1, minmax(0,1fr));
+  gap:10px;
+  margin: 10px 0 4px;
+}
+@media (min-width:560px){
+  .immig-policy-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+.immig-policy-card{
+  background: linear-gradient(160deg, rgba(0,0,0,.035), rgba(0,0,0,.01));
+  border:1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.immig-policy-active{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.immig-policy-head{ display:flex; align-items:center; gap:8px; }
+.immig-policy-icon{ font-size:20px; flex-shrink:0; }
+.immig-policy-name{ font-weight:700; font-size:14px; font-family: var(--font-head); flex:1; }
+.immig-policy-badge{
+  font-size:11px; font-weight:700;
+  background: var(--accent); color:#fff;
+  padding:2px 8px; border-radius:999px;
+  white-space:nowrap;
+}
+.immig-policy-desc{ margin:0; font-size:12.5px; line-height:1.55; color: var(--muted); }
+.immig-policy-select-btn{ align-self:flex-start; font-size:12.5px; padding:6px 14px; }
+.immig-settings-box{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px dashed var(--border-strong);
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.immig-setting-row{ display:flex; flex-direction:column; gap:6px; }
+.immig-setting-label{ font-size:13px; font-weight:600; }
+.immig-setting-hint{ margin:0; font-size:12px; line-height:1.6; color: var(--muted); }
+
+/* ================================
+   📊 พยากรณ์การคลัง (fiscal forecast panel)
+   ================================ */
+.fiscal-grid{
+  display:grid;
+  grid-template-columns: repeat(1, minmax(0,1fr));
+  gap:10px;
+}
+@media (min-width:560px){
+  .fiscal-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+.fiscal-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  background: linear-gradient(160deg, rgba(0,0,0,.03), rgba(0,0,0,.01));
+  border:1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding:12px 14px;
+}
+.fiscal-label{ font-size:13px; color:var(--muted); font-weight:600; }
+.fiscal-value{ font-weight:800; font-size:15px; white-space:nowrap; }
+.fiscal-good{ color: var(--success); }
+.fiscal-warn{ color: var(--warn); }
+.fiscal-bad{ color: var(--danger); }
+
+/* ================================
+   🚧 โครงสร้างเสียหาย (repair panel)
+   ================================ */
+.repair-grid{
+  display:grid;
+  grid-template-columns: repeat(1, minmax(0,1fr));
+  gap:12px;
+}
+@media (min-width:560px){
+  .repair-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (min-width:840px){
+  .repair-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+.repair-card{
+  background: linear-gradient(160deg, rgba(216,57,79,.08), rgba(216,57,79,.02));
+  border:1px solid rgba(216,57,79,.25);
+  border-radius: var(--radius);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.repair-head{ font-weight:700; font-size:14px; }
+.repair-card button{ width:100%; }
+
+/* ================================
+   🎭 เหตุการณ์ทางเลือกเชิงนโยบาย (crisis event modal)
+   ================================ */
+.crisis-modal-box{ width:480px; }
+.crisis-desc{
+  color: var(--muted);
+  line-height:1.6;
+  margin: 4px 0 18px;
+}
+.crisis-choice-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.crisis-choice-btn{
+  width:100%;
+  text-align:left;
+  padding:14px 16px;
+  font-size:14px;
+  line-height:1.5;
+  white-space:normal;
+}
+.crisis-choice-btn:nth-child(1){
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important;
+  color:#ffffff !important;
+  border-color: transparent !important;
+  font-weight:800 !important;
+}
+.crisis-choice-btn:nth-child(2){
+  background: linear-gradient(135deg, #f0b93f, var(--gold)) !important;
+  color:#3a2500 !important;
+  border-color: transparent !important;
+}
+.crisis-choice-btn:nth-child(3){
+  background: linear-gradient(135deg, var(--rose), #c73764) !important;
+  color:#ffffff !important;
+  border-color: transparent !important;
 }
