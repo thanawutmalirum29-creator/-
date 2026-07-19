@@ -181,20 +181,32 @@ const _oldSpawnCitizen = spawnCitizen;
 spawnCitizen = function(options) {
   options = options || {};
   const bypassPolicy = options.bypassPolicy === true;
+  const policy = (!bypassPolicy && typeof immigrationPolicy !== "undefined") ? immigrationPolicy : null;
+  const settings = (typeof immigrationSettings !== "undefined") ? immigrationSettings : { minKnowledge: 55, quotaPerMonth: 8, skilledMinAge: 19 };
 
-  if (!bypassPolicy && typeof immigrationPolicy !== "undefined") {
-    if (immigrationPolicy === "closed") {
-      // 🚫 ปิดรับชั่วคราว: ไม่มีผู้อพยพใหม่เข้าเมืองเลย
-      return;
-    }
-    if (immigrationPolicy === "selective" && Math.random() < 0.45) {
-      // 🎓 รับเฉพาะมีความรู้ขั้นต่ำ: ผู้สมัครส่วนหนึ่งไม่ผ่านเกณฑ์ตรวจสอบ ทำให้โตช้าลง
-      return;
+  if (policy === "closed") {
+    // 🚫 ปิดรับชั่วคราว: ไม่มีผู้อพยพใหม่เข้าเมืองเลย
+    return;
+  }
+
+  if (policy === "quota") {
+    // 🎫 โควตา: รับได้ไม่เกินจำนวนที่กำหนดต่อเดือน ไม่มีเงื่อนไขความรู้ ควบคุมการเติบโตแบบแม่นยำ/คาดเดาได้
+    const quota = settings.quotaPerMonth || 8;
+    if (typeof immigrationQuotaUsedThisMonth === "undefined" || immigrationQuotaUsedThisMonth >= quota) {
+      return; // เต็มโควตาของเดือนนี้แล้ว
     }
   }
 
   const gender = Math.random() < 0.5 ? "M" : "W";
-  const age = Math.floor(Math.random() * 35) + 1;
+  let age = Math.floor(Math.random() * 35) + 1;
+
+  // 🧑‍💼 นโยบาย "แรงงานมีทักษะ": มีแต่ผู้อพยพวัยทำงานขึ้นไปเท่านั้นที่ยื่นสมัครเข้ามา (ไม่มีเด็กติดตามครอบครัว)
+  // สุ่มช่วงอายุใหม่ตรงนี้เลยแทนที่จะสุ่มแบบเดิมแล้วค่อยกรองทิ้งทีหลัง เพราะกรองทิ้งทีหลังจะยิ่งทำให้
+  // สัดส่วนที่ผ่านเกณฑ์น้อยกว่าที่ควรเป็นซ้ำสอง (โดนกรองทั้งเรื่องอายุและความรู้ซ้อนกัน)
+  if (policy === "skilled") {
+    const minAge = Math.min(55, settings.skilledMinAge || 19);
+    age = minAge + Math.floor(Math.random() * (60 - minAge));
+  }
 
   let knowledge;
   if (age <= 10) knowledge = Math.floor(Math.random() * 11) + 10;
@@ -204,12 +216,22 @@ spawnCitizen = function(options) {
   else if (age <= 30) knowledge = Math.floor(Math.random() * 11) + 90;
   else knowledge = Math.floor(Math.random() * 21) + 100;
 
-  // 🎓 นโยบาย "รับเฉพาะมีความรู้ขั้นต่ำ": ยกระดับความรู้ผู้อพยพที่ผ่านเกณฑ์ให้ไม่ต่ำกว่ามาตรฐานที่กำหนด
-  // (จำลองว่าด่านตรวจคนเข้าเมืองคัดเฉพาะผู้มีวุฒิ/ทักษะสูงพอเข้ามา)
-  if (!bypassPolicy && typeof immigrationPolicy !== "undefined" && immigrationPolicy === "selective") {
-    const minKnowledgeForSelective = 55;
-    if (knowledge < minKnowledgeForSelective) {
-      knowledge = minKnowledgeForSelective + Math.floor(Math.random() * 20);
+  // 🎓 นโยบาย "รับเฉพาะมีความรู้ขั้นต่ำ" และ "แรงงานมีทักษะ" ใช้เกณฑ์ความรู้ขั้นต่ำร่วมกัน (ผู้เล่นปรับได้)
+  //
+  // ⚠️ แก้บั๊กสำคัญ: ของเดิมเช็คแบบ "สุ่มความรู้แล้วถ้าต่ำกว่าเกณฑ์ก็ปฏิเสธตรงๆ" ถ้าผู้เล่นตั้งเกณฑ์สูงเกินกว่า
+  // ที่ระบบสุ่มความรู้จะสุ่มได้จริง (เพดานสุ่มอยู่ราว 120) นโยบายนี้จะปฏิเสธผู้สมัคร "ทุกคนตลอดไป" ไม่มีใครผ่าน
+  // เกณฑ์ได้เลยสักคนเดียว เมืองจะหยุดรับผู้อพยพเข้าใหม่ทั้งที่นโยบายที่เลือกไม่ใช่ "ปิดรับ" (เมืองร้างทั้งที่ไม่ตั้งใจ)
+  //
+  // แก้โดยแยก "โอกาสถูกปฏิเสธ" ออกจาก "ระดับความรู้ที่สุ่มได้จริง": ยิ่งตั้งเกณฑ์สูง โอกาสถูกปฏิเสธยิ่งสูงตาม
+  // (สูงสุด 85% เพื่อไม่ให้ถึงขั้น 100% ที่จะปิดกั้นสนิท) ส่วนผู้ที่ผ่านการคัดกรองแล้ว จะถูกยกระดับความรู้ให้ไม่ต่ำ
+  // กว่าเกณฑ์เสมอไม่ว่าเกณฑ์จะตั้งไว้สูงแค่ไหน วิธีนี้ทำให้นโยบายยังทำงานได้จริงเสมอ ไม่ใช่กับดักที่ทำให้เมืองหยุดโต
+  if (policy === "selective" || policy === "skilled") {
+    const minK = Math.max(0, settings.minKnowledge || 55);
+    const rejectChance = Math.min(0.85, Math.max(0, (minK - 20) / 150));
+    if (Math.random() < rejectChance) return;
+
+    if (knowledge < minK) {
+      knowledge = minK + Math.floor(Math.random() * 20);
     }
   }
 
@@ -224,6 +246,18 @@ spawnCitizen = function(options) {
   });
 
   citizenIDCounter++;
+
+  if (policy === "quota" && typeof immigrationQuotaUsedThisMonth !== "undefined") {
+    immigrationQuotaUsedThisMonth++;
+  }
+
+  // 🤝 นโยบายมนุษยธรรม: รับทุกคนโดยไม่มีเงื่อนไข (เหมือน "เปิดรับทุกคน") แต่เก็บงบดูแล/ตั้งถิ่นฐานจากคลังเมือง
+  // ต่อผู้อพยพ 1 คน แลกกับความสุขประชาชนที่เพิ่มขึ้นเล็กน้อยทุกครั้ง (ประชาชนรู้สึกดีที่เมืองดูแลคนลำบาก)
+  if (policy === "humanitarian") {
+    if (typeof treasury !== "undefined") treasury -= 800;
+    if (typeof happiness !== "undefined") happiness = Math.min(100, happiness + 0.15);
+  }
+
   updateInfo();
 };
 
@@ -245,9 +279,15 @@ function applyJobEffects() {
   let soldierCount = citizens.filter(c => c.job === "ทหาร").length;
   let researcherCount = citizens.filter(c => c.job === "นักวิจัย").length;
 
-  foodStock += Math.floor(farmerCount * 0.1 * seasonMultiplier);
+  // 🌾 เพิ่มประสิทธิภาพเกษตรกรจาก 0.1 เป็น 0.22 ต่อคน — ทำให้ "มีเกษตรกรเยอะ" เป็นทางเลือกที่ช่วยแบ่งเบา
+  // ค่าอาหารได้จริง ไม่ใช่แค่ตัวเลขเล็กจิ๋วที่แทบไม่มีผล (ความต้องการอาหารรวมโตไม่มีเพดานตามประชากร
+  // แต่การผลิตของเกษตรกรเดิมช้าเกินจะตามทันแม้แต่เมืองขนาดกลาง)
+  foodStock += Math.floor(farmerCount * 0.22 * seasonMultiplier);
 
-  infrastructureImpact.shop *= (1 + (merchantCount * 0.1));
+  // 🛍️ คำนวณใหม่ทุกเดือนจากยอดพ่อค้าปัจจุบัน (ไม่ใช่คูณสะสม *= ทุกเดือนแบบเดิม ซึ่งถ้าไม่มีอะไรมารีเซ็ต
+  // ค่านี้จะพุ่งไม่มีเพดานได้ — เดิมมันไม่พุ่งเพราะบั๊กใน monthlyWeatherEvent() บังเอิญรีเซ็ตให้ทุก ๆ 2 เดือน)
+  // มีเพดานกันไม่ให้พ่อค้าล้นเมืองกลายเป็นบูสต์มหาศาลเกินจริง
+  merchantShopBoost = Math.min(1.6, 1 + (merchantCount * 0.1));
 
   if (doctorCount > 0) monthsSinceLastEpidemic += Math.floor(doctorCount / 4);
   if (engineerCount > 0) monthsSinceLastInfrastructureFailure += Math.floor(engineerCount / 5);

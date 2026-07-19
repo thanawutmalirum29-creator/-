@@ -1,34 +1,40 @@
+// 🌦️ สภาพอากาศรายเดือน — ผลกระทบ "เดือนต่อเดือน" ล้วนๆ เขียนลง weatherImpact เท่านั้น
+// (ไม่แตะ infrastructureImpact ซึ่งตอนนี้สงวนไว้สำหรับความเสียหายถาวรจากภัยพิบัติ/ระบบขนส่ง/คอมล่มเท่านั้น
+// — เดิมไฟล์นี้เขียนทับ infrastructureImpact ทั้งก้อนทุกเดือน ทำให้ความเสียหายถาวรที่เพิ่งเกิดไม่มีผล
+// อะไรต่อรายได้เลยแม้แต่เดือนเดียว เพราะโดนอากาศ "ล้าง" ทิ้งก่อนจะทันมีผลกับ collectTaxes() รอบถัดไป)
 function monthlyWeatherEvent() {
-  // ความน่าจะเป็นอากาศปกติ (50%)
-  if (Math.random() < 0.5) {
-    // รีเซ็ต infrastructureImpact กลับสู่ค่าปกติด้วย ไม่งั้นตัวคูณจากพายุเดือนก่อน
-    // จะค้างอยู่ตลอดไปแม้อากาศจะกลับมาปกติแล้ว
-    infrastructureImpact = { home: 1, shop: 1, factory: 1 };
+  // ความน่าจะเป็นอากาศปกติ (45%)
+  if (Math.random() < 0.45) {
+    weatherImpact = { home: 1, shop: 1, factory: 1 };
     return { happinessChange: 0, incomeMultiplier: 1, message: "อากาศปกติ" };
   }
-  
+
   const specialWeathers = [
-    { name: "แดดจัด", happiness: 2, incomeMultiplier: 1 },
-    { name: "ฝนตก", happiness: -1, incomeMultiplier: 0.98 },
-    { name: "พายุแรง", happiness: -3, incomeMultiplier: 0.95 },
-    { name: "อากาศเย็นสบาย", happiness: 3, incomeMultiplier: 1.05 }
+    { name: "แดดจัด", happiness: 2, incomeMultiplier: 1.02 },
+    { name: "ฝนตก", happiness: -1, incomeMultiplier: 0.96 },
+    { name: "พายุแรง", happiness: -4, incomeMultiplier: 0.90 },
+    { name: "อากาศเย็นสบาย", happiness: 3, incomeMultiplier: 1.06 },
+    // 🌵 ภัยแล้ง: ของใหม่ กระทบทั้งรายได้และราคาอาหาร (เกษตรกรผลิตอาหารได้น้อยลงเดือนนั้น) —
+    // เชื่อมสภาพอากาศเข้ากับระบบอาหารให้รู้สึกมีผลกระทบจริงมากขึ้น ไม่ใช่แค่ตัวเลขรายได้ลอยๆ
+    { name: "ภัยแล้ง", happiness: -3, incomeMultiplier: 0.93, foodPriceBump: 0.08 }
   ];
-  
+
   let weather = specialWeathers[Math.floor(Math.random() * specialWeathers.length)];
-  
-  // ปรับความสุข
-  happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
+
   happiness = Math.max(0, happiness + weather.happiness);
-  
-  // รีเซ็ต infrastructureImpact ก่อนปรับตามสภาพอากาศ
-  infrastructureImpact = {
-    home: 1 * weather.incomeMultiplier,
-    shop: 1 * weather.incomeMultiplier,
-    factory: 1 * weather.incomeMultiplier
+
+  weatherImpact = {
+    home: weather.incomeMultiplier,
+    shop: weather.incomeMultiplier,
+    factory: weather.incomeMultiplier
   };
-  
-  let message = `🌦 สภาพอากาศเดือนนี้: ${weather.name} (ความสุข ${weather.happiness >= 0 ? "+" : ""}${weather.happiness}, รายได้ ${(weather.incomeMultiplier > 1 ? "+" : "") + ((weather.incomeMultiplier - 1) * 100).toFixed(1)}%)`;
-  toast(message);
-  
+
+  if (weather.foodPriceBump) {
+    foodUnitCost = +(foodUnitCost * (1 + weather.foodPriceBump)).toFixed(2);
+  }
+
+  let message = `🌦 สภาพอากาศเดือนนี้: ${weather.name} (ความสุข ${weather.happiness >= 0 ? "+" : ""}${weather.happiness}, รายได้เดือนหน้า ${(weather.incomeMultiplier > 1 ? "+" : "") + ((weather.incomeMultiplier - 1) * 100).toFixed(1)}%)`;
+  toast(message, weather.incomeMultiplier < 1 ? "warning" : "success");
+
   return { happinessChange: weather.happiness, incomeMultiplier: weather.incomeMultiplier, message };
 }

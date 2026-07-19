@@ -1,4 +1,10 @@
 // ฟังก์ชันช่วยลดผลกระทบตามความสุข
+// 🐛 บั๊กที่แก้: เดิมแต่ละฟังก์ชันเช็คภัยพิบัติด้านล่างนี้ (epidemic/riot/infrastructure/war/transport/
+// environment/majorDisaster/technology) มีบรรทัด "happiness += researchEffects.monthlyHappinessIncrease"
+// ของตัวเองก่อนหักความสุขจากภัยพิบัตินั้นๆ ทั้งที่ nextMonth() ท้ายสุด (ดู nextmonth.js) ก็บวกค่านี้ให้
+// แบบไม่มีเงื่อนไขอยู่แล้วทุกเดือน ผลคือถ้าเดือนไหนมีภัยพิบัติ/อากาศพิเศษเกิดขึ้น ผู้เล่นที่วิจัย "สวนสาธารณะ"
+// (+1 ความสุข/เดือน) จะได้โบนัสนี้ซ้ำมากกว่า 1 ครั้งในเดือนเดียว (มากสุดคือหลายภัยพิบัติชนกันเดือนเดียวกัน)
+// ทำให้ตัวเลข "+1/เดือน" ที่บอกผู้เล่นไว้ไม่ตรงกับของจริง ตอนนี้ตัดออกให้เหลือจุดเดียวที่ nextmonth.js
 function adjustImpactByHappiness(value) {
     return (happiness < 30) ? Math.floor(value / 2) : value;
 }
@@ -40,7 +46,6 @@ function epidemicCheck() {
 
         let migrants = Math.max(1, baseMigrants - (doctorCount * 2));
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - baseHappinessLoss);
         for (let i = 0; i < migrants && citizens.length > 0; i++) citizens.pop();
 
@@ -72,7 +77,6 @@ function riotCheck() {
 
         let migrants = Math.max(1, baseMigrants - (policeCount + militaryCount));
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - baseHappinessLoss);
         for (let i = 0; i < migrants && citizens.length > 0; i++) citizens.pop();
 
@@ -97,16 +101,19 @@ function infrastructureFailureCheck() {
 
     if (Math.random() * 100 < actualChance) {
         let possibleStructures = ["ถนน", "สะพาน", "โรงไฟฟ้า", "ระบบน้ำประปา", "ท่าเรือ"];
-        let broken = possibleStructures[Math.floor(Math.random() * possibleStructures.length)];
+        // เลี่ยงจุดที่เสียหายค้างอยู่แล้วก่อน (กันการ์ดซ่อมซ้ำชื่อเดียวกันหลายใบใน UI) ถ้าทุกจุดเสียหาย
+        // ครบหมดแล้วพอดี (ซวยสุดๆ) ค่อยยอมให้ซ้ำได้ ถือว่าจุดเดิมพังซ้ำหนักขึ้นไปอีก
+        let candidates = possibleStructures.filter(s => !damagedStructures.includes(s));
+        if (candidates.length === 0) candidates = possibleStructures;
+        let broken = candidates[Math.floor(Math.random() * candidates.length)];
 
         damagedStructures.push(broken);
-        applyInfrastructureDamageEffect(broken);
+        recomputeInfrastructureDamage();
 
         let happinessLoss = 5 + cityLevel * 2;
         happinessLoss = adjustImpactByHappiness(happinessLoss);
         happinessLoss = adjustImpactByServants(happinessLoss, engineerCount + transportCount, services.infrastructure.maxServants + services.transport.maxServants);
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - happinessLoss);
 
         monthsSinceLastInfrastructureFailure = 0;
@@ -114,41 +121,57 @@ function infrastructureFailureCheck() {
     }
 }
 
-function applyInfrastructureDamageEffect(structure) {
-  if (structure === "โรงไฟฟ้า") {
-    infrastructureImpact.factory *= 0.7;
-  }
-  if (structure === "ถนน") {
-    infrastructureImpact.shop *= 0.85;
-    infrastructureImpact.home *= 0.9;
-  }
-  if (structure === "ระบบน้ำประปา") {
-    infrastructureImpact.home *= 0.85;
-    infrastructureImpact.shop *= 0.85;
-    infrastructureImpact.factory *= 0.85;
-  }
-  if (structure === "สะพาน" || structure === "ท่าเรือ") {
-    infrastructureImpact.factory *= 0.8;
-    infrastructureImpact.shop *= 0.85;
-  }
+// 🔧 คำนวณ infrastructureImpact ใหม่ทั้งหมดจากรายการ damagedStructures ปัจจุบัน (ไม่ใช่การคูณสะสม/
+// รีเซ็ตทีละจุดแบบเดิม) ข้อดี: 1) ซ่อมจุดหนึ่งจะไม่ไปลบผลของอีกจุดที่ยังเสียหายค้างอยู่โดยไม่ตั้งใจ
+// (บั๊กเดิม: ถ้า "ถนน" กับ "ระบบน้ำประปา" เสียหายพร้อมกัน แล้วซ่อมแค่ "ถนน" ค่า shop/home จะถูกรีเซ็ต
+// เป็น 1 ทั้งที่ "ระบบน้ำประปา" ยังเสียหายอยู่) 2) เรียกซ้ำได้ปลอดภัยทุกเมื่อ ไม่มีสถานะให้หลุดซิงค์
+function recomputeInfrastructureDamage() {
+  const impact = { home: 1, shop: 1, factory: 1 };
+  damagedStructures.forEach(structure => {
+    if (structure === "โรงไฟฟ้า") {
+      impact.factory *= 0.7;
+    }
+    if (structure === "ถนน") {
+      impact.shop *= 0.85;
+      impact.home *= 0.9;
+    }
+    if (structure === "ระบบน้ำประปา") {
+      impact.home *= 0.85;
+      impact.shop *= 0.85;
+      impact.factory *= 0.85;
+    }
+    if (structure === "สะพาน" || structure === "ท่าเรือ") {
+      impact.factory *= 0.8;
+      impact.shop *= 0.85;
+    }
+  });
+  infrastructureImpact = impact;
 }
-  
+
+// 💰 ค่าซ่อมผูกกับเพดานภาษีของเลเวลเมืองปัจจุบัน แทนตัวเลขตายตัว 5 ล้าน (เดิมแพงมากจนซ่อมไม่ไหวช่วงต้นเกม
+// แต่จิ๊บจ๊อยมากช่วงปลายเกม) ประมาณ 20% ของเพดานรายได้ต่อเดือน ณ เลเวลนั้น — จากการทดสอบด้วย
+// sim harness พบว่าตั้งไว้สูงกว่านี้ (เคยลองที่ 55%) ทำให้ 1 ครั้งซ่อมกินงบเกินครึ่งเดือนทั้งเดือน
+// รุนแรงเกินไปเมื่อบวกกับเหตุการณ์ทางเลือกและค่าดูแลปกติที่มีอยู่แล้ว งานวิจัยลดต้นทุนโรงงานช่วยลดค่าซ่อมได้เล็กน้อย
+function getRepairCost() {
+  const base = Math.round((cityTaxCap[cityLevel] || 300000) * 0.20);
+  return Math.round(base * (1 - (researchEffects.factoryCostReduction || 0) * 0.3));
+}
+
 function repairStructure(name) {
   let index = damagedStructures.indexOf(name);
   if (index === -1) return toast("❌ ไม่มีโครงสร้างนี้เสียหาย");
 
-  let repairCost = 5000000-(500000*researchEffects.factoryCostReduction);
-  if (treasury < repairCost) return toast("❌ เงินไม่พอซ่อม");
+  let repairCost = getRepairCost();
+  if (treasury < repairCost) return toast(`❌ เงินไม่พอซ่อม (ต้องการ ${repairCost.toLocaleString()} บาท)`);
 
   subtractTreasury(repairCost);
   damagedStructures.splice(index, 1);
+  recomputeInfrastructureDamage();
 
-  if (name === "โรงไฟฟ้า") infrastructureImpact.factory = 1;
-  if (name === "ถนน") { infrastructureImpact.shop = 1; infrastructureImpact.home = 1; }
-  if (name === "ระบบน้ำประปา") { infrastructureImpact.home = 1; infrastructureImpact.shop = 1; infrastructureImpact.factory = 1; }
-  if (name === "สะพาน" || name === "ท่าเรือ") { infrastructureImpact.factory = 1; infrastructureImpact.shop = 1; }
-
-  toast(`🔧 ซ่อม "${name}" เสร็จแล้ว!`);
+  toast(`🔧 ซ่อม "${name}" เสร็จแล้ว! (-${repairCost.toLocaleString()} บาท)`, "success");
+  if (typeof updateInfo === "function") updateInfo();
+  if (typeof updateRepairPanel === "function") updateRepairPanel();
+  if (typeof updateFiscalPanel === "function") updateFiscalPanel();
 }
   
 function warEventCheck() {
@@ -172,7 +195,6 @@ function warEventCheck() {
 
         let migrants = Math.max(1, baseMigrants - militaryCount);
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - baseHappinessLoss);
         for (let i = 0; i < migrants && citizens.length > 0; i++) citizens.pop();
 
@@ -198,16 +220,15 @@ function transportCrisisCheck() {
         happinessLoss = adjustImpactByHappiness(happinessLoss);
         happinessLoss = adjustImpactByServants(happinessLoss, transportCount, services.transport.maxServants);
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - happinessLoss);
 
         let penalty = 0.1 + cityLevel * 0.05;
-        infrastructureImpact.home *= (1 - penalty);
-        infrastructureImpact.shop *= (1 - penalty);
-        infrastructureImpact.factory *= (1 - penalty);
+        temporaryImpact.home *= (1 - penalty);
+        temporaryImpact.shop *= (1 - penalty);
+        temporaryImpact.factory *= (1 - penalty);
 
         monthsSinceLastTransportCrisis = 0;
-        toast(`🚧 ระบบขนส่งล่ม! ความสุขลด ${happinessLoss}, รายได้ลดลงชั่วคราว`);
+        toast(`🚧 ระบบขนส่งล่ม! ความสุขลด ${happinessLoss}, รายได้เดือนหน้าลดลงชั่วคราว`, "warning");
     }
 }
 
@@ -226,17 +247,22 @@ function environmentEventCheck() {
     if (Math.random() * 100 < actualChance) {
         let types = ["น้ำท่วมใหญ่", "มลพิษทางอากาศ", "ไฟป่า"];
         let disaster = types[Math.floor(Math.random() * types.length)];
+        // 🌊 "น้ำท่วมใหญ่" ใช้ตัวลดผลกระทบเฉพาะทาง (จากงานวิจัย "เขื่อนกันน้ำท่วม") ส่วนอีก 2 แบบ
+        // ใช้ตัวลดผลกระทบสิ่งแวดล้อมทั่วไปตามเดิม — เดิม disasterReduction.flood ถูกตั้งค่าไว้จากงานวิจัย
+        // แต่ไม่มีจุดไหนอ่านค่านี้ไปใช้เลย ทำให้ผู้เล่นลงทุนวิจัยเขื่อนกันน้ำท่วมไปแล้วไม่ได้ผลอะไรจริง
+        let reduction = disaster === "น้ำท่วมใหญ่"
+          ? researchEffects.disasterReduction.flood
+          : researchEffects.disasterReduction.environment;
 
         let happinessLoss = 10 + cityLevel * 3;
         happinessLoss = adjustImpactByHappiness(happinessLoss);
-        happinessLoss = Math.floor(happinessLoss * (1 - researchEffects.disasterReduction.environment));
+        happinessLoss = Math.floor(happinessLoss * (1 - reduction));
         happinessLoss = adjustImpactByServants(happinessLoss, envCount, services.environment.maxServants);
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - happinessLoss);
         monthsSinceLastEnvDisaster = 0;
 
-        toast(`🌱 เหตุการณ์สิ่งแวดล้อม: ${disaster}! ความสุขลด ${happinessLoss}`);
+        toast(`🌱 เหตุการณ์สิ่งแวดล้อม: ${disaster}! ความสุขลด ${happinessLoss}`, "warning");
     }
 }
 
@@ -255,21 +281,26 @@ function majorDisasterEventCheck() {
     if (Math.random() * 100 < actualChance) {
         let types = ["แผ่นดินไหว", "สึนามิ", "ภูเขาไฟระเบิด"];
         let disaster = types[Math.floor(Math.random() * types.length)];
+        // 🏔️ "แผ่นดินไหว" ใช้ตัวลดผลกระทบเฉพาะทาง (จากงานวิจัย "ป้องกันภัยพิบัติ") ส่วนสึนามิ/ภูเขาไฟ
+        // ยังใช้ตัวลดผลกระทบภัยพิบัติใหญ่ทั่วไปตามเดิม (เดิม disasterReduction.earthquake ถูกตั้งค่า
+        // จากงานวิจัยแต่ไม่มีจุดไหนอ่านไปใช้เลย เช่นเดียวกับ .flood ข้างต้น)
+        let reduction = disaster === "แผ่นดินไหว"
+          ? researchEffects.disasterReduction.earthquake
+          : researchEffects.disasterReduction.majorDisaster;
 
         let happinessLoss = 30 + cityLevel * 5;
         happinessLoss = adjustImpactByHappiness(happinessLoss);
-        happinessLoss = Math.floor(happinessLoss * (1 - researchEffects.disasterReduction.majorDisaster));
+        happinessLoss = Math.floor(happinessLoss * (1 - reduction));
         happinessLoss = adjustImpactByServants(happinessLoss, reliefCount, services.disaster.maxServants);
 
         let baseMigrants = Math.floor(Math.random() * (5 + cityLevel * 5)) + 5;
         let migrants = Math.max(5, baseMigrants - (reliefCount * 3));
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - happinessLoss);
         for (let i = 0; i < migrants && citizens.length > 0; i++) citizens.pop();
 
         monthsSinceLastMajorDisaster = 0;
-        toast(`🌋 ภัยพิบัติใหญ่: ${disaster}! ความสุขลด ${happinessLoss}, คนย้ายออก ${migrants}`);
+        toast(`🌋 ภัยพิบัติใหญ่: ${disaster}! ความสุขลด ${happinessLoss}, คนย้ายออก ${migrants}`, "danger");
     }
 }
 
@@ -287,8 +318,11 @@ function tourismEventCheck() {
     if (Math.random() * 100 < actualChance && citizens.length >= minPopForTourism) {
         let bonus = Math.floor((120000 + (tourismCount * 32000)) * Math.pow(cityLevel, 0.9));
         let handlingCost = Math.floor(bonus * 0.25);
+        // 🐛 บั๊กที่แก้: เดิม subtractTreasury(handlingCost) หักค่าจัดการไปแล้ว แต่บรรทัดถัดมา
+        // "treasury += bonus - handlingCost" ดันหัก handlingCost ซ้ำอีกรอบ ทำให้ผลตอบแทนจริง
+        // ของทุกครั้งที่ท่องเที่ยวบูมคือ (bonus - handlingCost×2) ไม่ใช่ (bonus - handlingCost) ตามที่ตั้งใจ
+        addTreasury(bonus);
         subtractTreasury(handlingCost);
-        treasury += Math.floor(bonus - handlingCost);
 
         monthsSinceLastTourismBoom = 0;
         toast(`🏖️ การท่องเที่ยวบูม! ได้รายได้เพิ่ม ${bonus.toLocaleString()} บาท`);
@@ -309,18 +343,17 @@ function technologyEventCheck() {
 
     if (Math.random() * 100 < actualChance) {
         let penalty = 0.15 + (cityLevel * 0.03); // เมืองใหญ่โดนหนักขึ้น
-        infrastructureImpact.factory *= (1 - penalty);
-        infrastructureImpact.shop *= (1 - penalty);
+        temporaryImpact.factory *= (1 - penalty);
+        temporaryImpact.shop *= (1 - penalty);
 
         let happinessLoss = 5 + cityLevel * 2;
         happinessLoss = adjustImpactByHappiness(happinessLoss);
         happinessLoss = adjustImpactByServants(happinessLoss, techCount, services.technology.maxServants);
 
-        happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - happinessLoss);
         monthsSinceLastTechBreakdown = 0;
 
-        toast(`💻 ระบบคอมล่ม! ความสุขลด ${happinessLoss}, รายได้ร้าน/โรงงานลดลง`);
+        toast(`💻 ระบบคอมล่ม! ความสุขลด ${happinessLoss}, รายได้ร้าน/โรงงานเดือนหน้าลดลงชั่วคราว`, "warning");
     }
 }
 
@@ -328,7 +361,7 @@ function positiveEventCheck() {
   if (Math.random() < 0.28) {
     const events = [
       { text: "📦 งานจัดแสดงใหญ่ ดึงคนเที่ยวแต่ใช้งบจัด", action: () => { addTreasury(300000); subtractTreasury(200000); } },
-      { text: "🚧 โครงการชุมชนดี แต่รบกวนการจราจร", action: () => { happiness = Math.min(100, happiness + 5); infrastructureImpact.shop *= 0.95; } },
+      { text: "🚧 โครงการชุมชนดี แต่รบกวนการจราจร", action: () => { happiness = Math.min(100, happiness + 5); temporaryImpact.shop *= 0.95; } },
       { text: "🏗️ นักลงทุนสร้างโรงงานขนาดกลาง", action: () => { factories.push({ type: "factory", size: "medium", owner: "INVESTOR" }); } },
       { text: "💰 ได้รับเงินสนับสนุนเล็กน้อยจากองค์กร", action: () => { if (citizens.length >= 30) addTreasury(250000); } },
       { text: "🎉 ชาวเมืองจัดงานปรับภูมิทัศน์ ความสุขเพิ่ม!", action: () => { happiness = Math.min(100, happiness + 8); } },

@@ -24,9 +24,18 @@ function getGameState() {
     researchMonthsLeft,
     damagedStructures,
     infrastructureImpact,
+    weatherImpact,
+    temporaryImpact,
+    merchantShopBoost,
     currentSeasonName,            // ฤดูกาล
     currentEconomy,                // เศรษฐกิจโลก
+    upcomingEconomy,               // พยากรณ์เศรษฐกิจปีหน้า
     loan,                          // เงินกู้ทั้งหมด
+    loanHistory,
+    festivalHistory,
+    activeCrisisEvent,
+    monthsSinceLastCrisisEvent,
+    crisisEventReputation,
     monthsSinceLastEpidemic,
     monthsSinceLastRiot,
     monthsSinceLastInfrastructureFailure,
@@ -37,9 +46,12 @@ function getGameState() {
     monthsSinceLastTourismBoom,
     monthsSinceLastTechBreakdown,
     monthsInFamine,
+    monthsInDebt,
     taxMultiplier,
     historyLog,
     immigrationPolicy,
+    immigrationSettings,
+    immigrationQuotaUsedThisMonth,
     // ถ้ามีตัวแปรอื่น ๆ ในไฟล์คุณ เพิ่มตรงนี้
   };
 }
@@ -79,9 +91,26 @@ function setGameState(state) {
   researchMonthsLeft = state.researchMonthsLeft || 0;
   damagedStructures = state.damagedStructures || [];
   infrastructureImpact = state.infrastructureImpact || { home: 1, shop: 1, factory: 1 };
+  // เซฟเก่าก่อนแยกชั้น weather/temporary/merchant ออกจาก infrastructureImpact จะไม่มี 3 field นี้
+  // ให้เริ่มที่ค่ากลาง (ไม่มีผลกระทบ) ไปก่อน ระบบจะคำนวณใหม่ให้เองตั้งแต่เดือนถัดไป
+  weatherImpact = state.weatherImpact || { home: 1, shop: 1, factory: 1 };
+  temporaryImpact = state.temporaryImpact || { home: 1, shop: 1, factory: 1 };
+  merchantShopBoost = state.merchantShopBoost || 1;
   currentSeasonName = state.currentSeasonName || "Spring";
   currentEconomy = state.currentEconomy || "Stable";
+  upcomingEconomy = state.upcomingEconomy || null;
   loan = state.loan || { totalBorrowed: 0, remainingDebt: 0, monthlyPayment: 0, isPaying: false };
+  loanHistory = Array.isArray(state.loanHistory) ? state.loanHistory : [];
+  festivalHistory = Array.isArray(state.festivalHistory) ? state.festivalHistory : [];
+  activeCrisisEvent = state.activeCrisisEvent || null;
+  // เซฟเก่าอาจเก็บ activeCrisisEvent ไว้ตอนที่ยังไม่ได้เลือก แต่ choices มี function (apply) อยู่ข้างใน
+  // ซึ่ง JSON.stringify ไม่เก็บ function ไว้ (จะหายไปตอนเซฟ) ต้อง map กลับไปหาสถานการณ์ตัวจริงจาก id แทน
+  if (activeCrisisEvent && activeCrisisEvent.id && typeof CRISIS_SCENARIOS !== "undefined") {
+    const real = CRISIS_SCENARIOS.find(s => s.id === activeCrisisEvent.id);
+    activeCrisisEvent = real || null;
+  }
+  monthsSinceLastCrisisEvent = state.monthsSinceLastCrisisEvent ?? 3;
+  crisisEventReputation = state.crisisEventReputation || 0;
   monthsSinceLastEpidemic = state.monthsSinceLastEpidemic ?? 999;
   monthsSinceLastRiot = state.monthsSinceLastRiot ?? 999;
   monthsSinceLastInfrastructureFailure = state.monthsSinceLastInfrastructureFailure ?? 999;
@@ -92,6 +121,7 @@ function setGameState(state) {
   monthsSinceLastTourismBoom = state.monthsSinceLastTourismBoom ?? 999;
   monthsSinceLastTechBreakdown = state.monthsSinceLastTechBreakdown ?? 999;
   monthsInFamine = state.monthsInFamine ?? 0;
+  monthsInDebt = state.monthsInDebt ?? 0;
   taxMultiplier = state.taxMultiplier || {
     home:    { small: 1, large: 1 },
     shop:    { small: 1, medium: 1, large: 1 },
@@ -101,6 +131,12 @@ function setGameState(state) {
   historyLog = Array.isArray(state.historyLog) ? state.historyLog : [];
   // เซฟเก่าก่อนมีฟีเจอร์นโยบายตรวจคนเข้าเมืองจะไม่มี field นี้ ให้ใช้ "เปิดรับทุกคน" เป็นค่าเริ่มต้น (พฤติกรรมเดิม)
   immigrationPolicy = state.immigrationPolicy || "open";
+  // เซฟเก่าก่อนมีการปรับเกณฑ์ได้ (แค่ selective/closed/open ตายตัว) จะไม่มี field นี้ ให้ใช้ค่าเริ่มต้นกลางๆ แทน
+  immigrationSettings = Object.assign(
+    { minKnowledge: 55, quotaPerMonth: 8, skilledMinAge: 19 },
+    state.immigrationSettings || {}
+  );
+  immigrationQuotaUsedThisMonth = state.immigrationQuotaUsedThisMonth || 0;
 }
 
 // เซฟเกม
@@ -145,6 +181,9 @@ function loadGame(slotName) {
   updateInfo();
   if (typeof refreshTaxSliders === "function") refreshTaxSliders();
   if (typeof refreshImmigrationUI === "function") refreshImmigrationUI();
+  if (typeof updateFiscalPanel === "function") updateFiscalPanel();
+  if (typeof updateRepairPanel === "function") updateRepairPanel();
+  if (typeof updateLoanStatus === "function") updateLoanStatus();
 
   // หมายเหตุ: เกมนี้เดินเดือนด้วยปุ่ม "เดือนถัดไป" ไม่มี auto-loop
   // (ของเดิมพยายามตั้ง setInterval(nextMonth, gameSpeed) แต่ gameSpeed
@@ -152,6 +191,11 @@ function loadGame(slotName) {
 
   closeSaveManager();
   toast(`✅ โหลดเกมจาก "${slotName}" สำเร็จ`);
+
+  // 🎭 ถ้าเซฟนี้บันทึกไว้ตอนมีเหตุการณ์ทางเลือกค้างอยู่พอดี (ยังไม่ทันเลือก) เปิด modal ให้เลือกต่อทันที
+  if (activeCrisisEvent && typeof showCrisisModal === "function") {
+    showCrisisModal();
+  }
 }
 
 // ลบเซฟ

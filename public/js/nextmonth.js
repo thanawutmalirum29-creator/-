@@ -62,14 +62,14 @@ function _ensureInfoSkeleton() {
     💼 ข้าราชการชั้นสูง:<br><span id="info_servant_list"></span><br>
     💸 เงินเดือนข้าราชการ: <span id="info_servant_cost"></span> บาท/เดือน<br><br>
     <br>🏙️ เลเวลเมือง: <span id="info_citylevel"></span> (เพดานภาษีรวม: <span id="info_taxcap"></span> บาท/เดือน)<br>
-    💰 เงินรัฐ: <span id="info_treasury"></span><br>
+    💰 เงินรัฐ: <span id="info_treasury"></span><span id="info_debt_tag" class="tag" style="color:var(--danger);display:none"></span><br>
     😊 ความสุข: <span id="info_happiness"></span>%<br>
     💵 รายได้เดือนนี้:<br>
     🧾 รายได้ภาษี(เต็ม): <span id="info_taxincome"></span> บาท<br>
     🍛 ความต้องการอาหารเดือนนี้: <span id="info_foodneed"></span> มื้อ<br>
     🍽️ อาหารคงเหลือ: <span id="info_foodstock"></span> มื้อ<span id="info_famine_tag" class="tag" style="color:var(--danger);display:none"></span><br>
     🛒 ซื้ออาหาร <span id="info_foodbuy"></span> มื้อ (รวม <span id="info_foodbuycost"></span> บาท)<br>
-    🎪 จัดเทศกาล: ใช้เงิน ${(500000).toLocaleString()} บาท และอาหาร ${(30000).toLocaleString()} มื้อ (ความสุข +30~50)<br><br>
+    🎪 จัดเทศกาล: <span id="info_festival_status"></span><br><br>
     🏠 บ้าน: <span id="info_homes_total"></span> หลัง (เล็ก: <span id="info_homes_small"></span>, ใหญ่: <span id="info_homes_large"></span>)<br>
     🏪 ร้านค้า: <span id="info_shops_total"></span> แห่ง (เล็ก: <span id="info_shops_small"></span>, กลาง: <span id="info_shops_medium"></span>, ใหญ่: <span id="info_shops_large"></span>)<br>
     🏭 โรงงาน: <span id="info_factories_total"></span> แห่ง (เล็ก: <span id="info_factories_small"></span>, กลาง: <span id="info_factories_medium"></span>, ใหญ่: <span id="info_factories_large"></span>)<br><br>
@@ -110,7 +110,7 @@ function updateInfo() {
 
   let eduStats = getEducationStats();
   let totalServants = Object.values(civilServants).reduce((a, b) => a + b, 0);
-  let servantCost = Math.ceil(totalServants * (servantSalary * 30 + (yearCount - 1) * 5000));
+  let servantCost = Math.ceil(totalServants * getCivilServantSalaryRate(30));
 
   let servantText = Object.entries(civilServants).map(([key, val]) => services[key] ? `👨‍💼 ${services[key].name}: ${val} คน` : "").join("<br>");
 
@@ -153,6 +153,20 @@ function updateInfo() {
   _setInfoText("info_foodneed", foodNeededThisMonth.toLocaleString());
   _setInfoText("info_foodstock", foodStock.toLocaleString());
 
+  const debtEl = document.getElementById("info_debt_tag");
+  if (debtEl) {
+    if (monthsInDebt > 0) {
+      const debtText = ` ⚠️ ติดลบต่อเนื่อง ${monthsInDebt}/3 เดือน`;
+      if (_infoFieldCache["info_debt_tag"] !== debtText) {
+        _infoFieldCache["info_debt_tag"] = debtText;
+        debtEl.textContent = debtText;
+      }
+      debtEl.style.display = "";
+    } else {
+      debtEl.style.display = "none";
+    }
+  }
+
   const famineEl = document.getElementById("info_famine_tag");
   if (famineEl) {
     if (monthsInFamine > 0) {
@@ -169,6 +183,14 @@ function updateInfo() {
 
   _setInfoText("info_foodbuy", foodPurchasePerMonth.toLocaleString());
   _setInfoText("info_foodbuycost", Math.ceil(foodPurchasePerMonth * foodUnitCost).toLocaleString());
+
+  if (typeof getFestivalStatus === "function") {
+    const fs = getFestivalStatus();
+    const festivalText = fs.onCooldown
+      ? `พักฟื้นอีก ${fs.monthsRemaining} เดือนถึงจะจัดได้อีกครั้ง`
+      : `ใช้เงิน ${fs.cost.toLocaleString()} บาท และอาหาร ${fs.foodCost.toLocaleString()} มื้อ (ความสุข +${Math.floor(30 * fs.effectMultiplier)}~${Math.floor(50 * fs.effectMultiplier)}${fs.effectMultiplier < 1 ? `, ลดเหลือ ${Math.round(fs.effectMultiplier * 100)}% เพราะจัดถี่` : ""})`;
+    _setInfoText("info_festival_status", festivalText);
+  }
 
   _setInfoText("info_homes_total", homes.length.toLocaleString());
   _setInfoText("info_homes_small", smallHomes);
@@ -201,6 +223,60 @@ function updateInfo() {
   _setInfoHTML("info_service_list", serviceStatus);
 }
 
+// 📊 แผงพยากรณ์การคลัง — อยู่นอก accordion "รายงานภาพรวมโดยละเอียด" ตั้งใจให้แสดงผลตลอดเวลา
+// (ไม่ผ่าน updateInfo() เพราะ uiPerf.js จะข้าม updateInfo() ทั้งหมดถ้า accordion ปิดอยู่ ซึ่งเป็นค่าเริ่มต้น
+// ทำให้ถ้าฝังไว้ใน updateInfo() แผงนี้จะไม่อัปเดตเลยตราบใดที่ผู้เล่นไม่เคยกางแผงรายงานละเอียดออกดู)
+function updateFiscalPanel() {
+  const netEl = document.getElementById("fiscal_net");
+  if (!netEl) return; // ไม่มีแผงนี้ในหน้า (กันพัง ไม่ใช่ข้อผิดพลาด)
+
+  const forecast = getFiscalForecast();
+  const sign = forecast.netIfFundAll >= 0 ? "+" : "";
+  netEl.textContent = `${sign}${forecast.netIfFundAll.toLocaleString()} บาท/เดือน`;
+  netEl.className = "fiscal-value " + (forecast.netIfFundAll >= 0 ? "fiscal-good" : "fiscal-bad");
+
+  const capPct = Math.round(forecast.capUtilization * 100);
+  const capEl = document.getElementById("fiscal_capuse");
+  if (capEl) {
+    const capNote = forecast.capUtilization >= 0.95 ? " ⚠️ ชนเพดานแล้ว" : forecast.capUtilization >= 0.8 ? " ใกล้เพดาน" : "";
+    capEl.textContent = `${capPct}%${capNote}`;
+    capEl.className = "fiscal-value " + (forecast.capUtilization >= 0.95 ? "fiscal-bad" : forecast.capUtilization >= 0.8 ? "fiscal-warn" : "fiscal-good");
+  }
+
+  const econEl = document.getElementById("fiscal_economy");
+  if (econEl) {
+    econEl.textContent = currentEconomy === "Boom" ? "🚀 เฟื่องฟู" : currentEconomy === "Recession" ? "📉 ถดถอย" : "➖ ทรงตัว";
+    econEl.className = "fiscal-value " + (currentEconomy === "Boom" ? "fiscal-good" : currentEconomy === "Recession" ? "fiscal-bad" : "");
+  }
+
+  const forecastEl = document.getElementById("fiscal_economy_forecast");
+  if (forecastEl) {
+    forecastEl.textContent = !upcomingEconomy ? "ยังไม่ทราบ (รอถึงเดือนที่ 10)"
+      : upcomingEconomy === "Boom" ? "🚀 เฟื่องฟู" : upcomingEconomy === "Recession" ? "📉 ถดถอย" : "➖ ทรงตัว";
+  }
+}
+
+// 🚧 แผงโครงสร้างเสียหาย — โผล่มาเฉพาะตอนมีของเสียหายค้างอยู่ (ซ่อนไว้ถ้าไม่มี ไม่ให้หน้ารก)
+function updateRepairPanel() {
+  const section = document.getElementById("repairSection");
+  const grid = document.getElementById("repairGrid");
+  if (!section || !grid) return;
+
+  if (!damagedStructures || damagedStructures.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  section.style.display = "";
+
+  const cost = getRepairCost();
+  grid.innerHTML = damagedStructures.map(name => `
+    <div class="repair-card">
+      <div class="repair-head">🚧 ${name}</div>
+      <button onclick="repairStructure('${name}')">🔧 ซ่อม (${cost.toLocaleString()} บาท)</button>
+    </div>
+  `).join("");
+}
+
 function nextMonth() {
   checkGameOver();
   updateCityLevel();
@@ -211,11 +287,21 @@ function nextMonth() {
   monthCount++;
   monthsSinceLastBirth++;
 
+  // 🎫 รีเซ็ตโควตาผู้อพยพของนโยบาย "quota" ทุกต้นเดือน ไม่งั้นเดือนถัดไปจะรับใครเพิ่มไม่ได้เลยเพราะ
+  // ตัวนับค้างจากเดือนก่อนไม่เคยถูกล้าง
+  immigrationQuotaUsedThisMonth = 0;
+
   if (monthCount > 12) {
     yearCount++;
     monthCount = 1;
     updateGlobalEconomy(yearCount);
+    // 🎂 อายุประชาชน +1 ปีละครั้งตอนขึ้นปีใหม่ (ดูคำอธิบายเต็มด้านล่างที่จุดที่ย้ายออกมา)
+    ageCitizens();
+  }
 
+  // 🔮 ประกาศพยากรณ์เศรษฐกิจปีหน้าล่วงหน้า 2 เดือน (ดู GlobalEconomy.js)
+  if (monthCount === 10 && typeof announceEconomyForecast === "function") {
+    announceEconomyForecast();
   }
 
   if (monthsSinceLastBirth >= 4) {
@@ -231,6 +317,11 @@ income *= (1 + researchEffects.taxIncomeBonus);
 income = applyEconomyEffect(income);
 
 latestGrossIncome = income;
+
+// ⏱️ temporaryImpact เพิ่งถูกใช้คำนวณรายได้เดือนนี้ไปแล้ว (ผ่าน collectTaxes() ข้างบน) รีเซ็ตกลับเป็น
+// ปกติทันที ให้เหตุการณ์ที่จะเช็คด้านล่างในเดือนนี้ (ขนส่งล่ม/คอมล่ม ฯลฯ) ตั้งค่าใหม่ไว้ใช้ "เดือนหน้า" แทน
+temporaryImpact = { home: 1, shop: 1, factory: 1 };
+
 let net = payLoanFromIncome(latestGrossIncome);
 latestNetIncome = net;
 addTreasury(net);
@@ -244,9 +335,14 @@ addTreasury(net);
   subtractTreasury(welfare);
 
   // 🧾 ผลกระทบความสุขจากนโยบายภาษี: ขึ้นภาษีเกินมาตรฐานกระทบความสุขแรงกว่าลดภาษีที่ให้โบนัสเล็กน้อย (ไม่จูงใจให้ตั้งภาษีสูงสุดตลอด)
+  // 🔧 ปรับตัวคูณจาก 12 เป็น 16 — จากการทดสอบด้วย sim harness พบว่าที่ 12 ผลกระทบจริงถูกกลบแทบมิด
+  // เพราะความสุขพื้นฐานจากการจ่ายงบทุกกระทรวง+งานวิจัยสูงพอจะดันความสุขกลับไปชนเพดาน 100 ได้เกือบตลอด
+  // ทำให้ผู้เล่นตั้งภาษี 150% เต็มแทบทุกช่องแล้ว "มองไม่เห็นผลเสีย" เลยในทางปฏิบัติ ทดสอบหลาย seed ที่ 16
+  // ให้ผลชัดเจนขึ้นมาก (ความสุขตกลงมาค้างต่ำกว่า 100 จริงจังและนานพอจะรู้สึกได้) โดยยังไม่ทำให้เมืองพังทันที
+  // เสมอไป (ลองที่ 18-24 แล้วเจอเมืองล่มสลายกะทันหันในบาง seed ซึ่งรุนแรงเกินไป)
   const taxDeviation = getTaxPolicyDeviation();
   if (taxDeviation > 0) {
-    happiness = Math.max(0, happiness - Math.round(taxDeviation * 12));
+    happiness = Math.max(0, happiness - Math.round(taxDeviation * 16));
   } else if (taxDeviation < 0) {
     happiness = Math.min(100, happiness + Math.round(-taxDeviation * 6));
   }
@@ -262,8 +358,22 @@ const foodNeeded = getFoodNeeded();
 // ปรับราคาตามเศรษฐกิจ
 let economyFactor = (currentEconomy === 'Recession' ? 1.5 : (currentEconomy === 'Boom' ? 0.8 : 1));
 let scarcityRatio = (foodStock < foodNeeded) ? (foodNeeded - foodStock) / Math.max(1, foodNeeded) : 0;
-let dynamicIncrement = foodPriceIncrement * economyFactor * (1 + scarcityRatio);
-foodUnitCost = Math.max(1, +(foodUnitCost + dynamicIncrement).toFixed(3));
+// 🍚 ปรับสูตรราคาอาหารใหม่ทั้งหมด — จากการทดสอบด้วย sim harness (จำลอง 30 ปี หลาย seed หลายรูปแบบการเล่น
+// ตั้งแต่ปล่อยผ่านเฉยๆ ไปจนถึงบริหารภาษี/วิจัยเต็มที่) พบว่าสูตรเดิม (foodPriceIncrement คงที่ ~3.5%/เดือน
+// บวกเข้าไปทุกเดือนไม่มีเงื่อนไข) ทำให้ราคาอาหารพุ่งขึ้นราว 7 เท่าใน 5 ปีแบบผู้เล่นควบคุมไม่ได้เลย
+// ไม่ว่าจะบริหารสต๊อกอาหารดีแค่ไหนหรือปล่อยเฉยเลยก็ตาม กลายเป็นสาเหตุหลักเดียวที่ทำให้แทบทุกรูปแบบการเล่น
+// (ทั้งปล่อยเฉยและบริหารเก่ง) ล้มละลายพร้อมกันในช่วงปีที่ 5-7 — ทั้งที่ควรจะเป็นจุดที่แยกผลลัพธ์ระหว่าง
+// ผู้เล่นที่ดูแลสต๊อกอาหารสม่ำเสมอ (ควรอยู่รอดยาวๆ ได้จริง) กับผู้เล่นที่ปล่อยขาดเป็นระยะ (ควรเจ็บตัวเร็วกว่า)
+// ใหม่: ลดเงินเฟ้อพื้นฐานที่ขึ้นตายตัวทุกเดือนลงมาก (0.035 -> 0.006) และให้ราคาขยับตาม "ภาวะขาดแคลนจริง"
+// เป็นตัวขับหลักแทน (คูณน้ำหนักขึ้นจาก 0.6 เป็น 2.2 ชดเชยที่ตัดฐานเดิมออก) ถ้าสต๊อกเหลือเฟือต่อเนื่อง
+// (เกิน 1.5 เท่าของความต้องการ) ราคาจะค่อยๆ คลายตัวลงเอง (แต่ไม่ต่ำกว่าราคาตั้งต้น 20 บาท/มื้อ)
+let dynamicIncrement;
+if (scarcityRatio === 0 && foodStock > foodNeeded * 1.5) {
+  dynamicIncrement = -Math.min(0.01 * economyFactor, (foodUnitCost - 20) * 0.01);
+} else {
+  dynamicIncrement = (0.006 + foodPriceIncrement * scarcityRatio * 2.2) * economyFactor;
+}
+foodUnitCost = Math.max(20, +(foodUnitCost + dynamicIncrement).toFixed(3));
 
 // หักอาหารและลดความสุขตามสัดส่วน
 foodStock -= foodNeeded;
@@ -278,8 +388,7 @@ if (foodStock < 0) {
   const shortageRate = lacking / Math.max(1, foodNeeded);
   const happinessPenalty = Math.ceil(shortageRate * 20);
 
-  // ลดความสุข
-  happiness = Math.min(100, happiness + researchEffects.happinessBonus + researchEffects.monthlyHappinessIncrease);
+  // ลดความสุข (โบนัสความสุขจากงานวิจัยถูกบวกให้แล้วครั้งเดียวท้าย nextMonth() ไม่ต้องบวกซ้ำตรงนี้)
   happiness = Math.max(0, happiness - happinessPenalty);
 
   monthsInFamine++;
@@ -288,6 +397,17 @@ if (foodStock < 0) {
   }
 } else {
   monthsInFamine = 0;
+}
+
+// 💸 ติดตามภาวะหนี้สินต่อเนื่อง (ดูคำอธิบายเต็มใน Global.js/checkGameOver) — เกณฑ์เดียวกับเดิม
+// (คลังติดลบเกิน 1,000,000) แต่ตอนนี้ต้องติดลบต่อเนื่อง 3 เดือนติดถึงจะนับว่าล้มละลายจริง
+if (treasury < -1000000) {
+  monthsInDebt++;
+  if (monthsInDebt === 2) {
+    toast(`🚨 คลังติดลบต่อเนื่อง 2 เดือนแล้ว! หากไม่แก้ไขเดือนหน้าอาจถึงขั้นล้มละลาย (ลดรายจ่าย/ปรับภาษี/กู้เงินด่วน)`, "danger");
+  }
+} else {
+  monthsInDebt = 0;
 }
 
   updateLoanStatus();
@@ -308,6 +428,12 @@ if (foodStock < 0) {
       btn.classList.remove("funded");
     }
 });
+
+// 🔧 กันความสุขติดลบหลังลูปด้านบน (เดิมลูปนี้ไม่กันเลย ถ้าแผนกส่วนใหญ่ไม่มีงบพร้อมกันอาจติดลบได้ก่อนจะไป
+// โดนคลุมที่จุดอื่น) ตั้งใจ "ไม่" คลุมเพดานบนที่ 100 ตรงนี้ เพราะท้ายฟังก์ชันนี้มีการคำนวณ happinessCap
+// แบบไดนามิกที่อาจสูงกว่า 100 ได้จริง (จากโบนัสวิจัย/ข้าราชการสวนสาธารณะ) การคลุมที่ 100 ตรงนี้ก่อน
+// จะไปตัดโบนัสส่วนเกินทิ้งอย่างไม่ตั้งใจ ปล่อยให้ตรรกะท้ายฟังก์ชัน (บรรทัดล่างๆ) เป็นผู้ตัดสินเพดานบนแทน
+happiness = Math.max(0, happiness);
 
 // รีเซ็ตสถานะปุ่มจ่ายทั้งหมด
 let fundAllBtn = document.getElementById("fundAllBtn");
@@ -353,6 +479,13 @@ if (fundAllDockBtn) {
   monthlyWeatherEvent();
   positiveEventCheck();
 
+  // 🎭 เหตุการณ์ทางเลือกเชิงนโยบาย (ดู CrisisEvent.js) — ต่างจากเหตุการณ์ข้างบนตรงที่ระบบนี้ไม่ resolve
+  // เองอัตโนมัติ จะค้างรอให้ผู้เล่นเลือกทางออกผ่าน modal แทน (เปิด modal ตอนท้ายฟังก์ชันนี้ ดูด้านล่าง)
+  let crisisJustTriggered = false;
+  if (typeof checkCrisisEvent === "function") {
+    crisisJustTriggered = checkCrisisEvent();
+  }
+
   {
     const totalDrop = happinessBeforeEvents - happiness;
     if (totalDrop > MONTHLY_EVENT_LOSS_CAP) {
@@ -373,7 +506,11 @@ if (fundAllDockBtn) {
   randomBuildMonthly();
   buildHomesIfNeeded();
   monthlyRumorEvent();
-  ageCitizens();
+  // 🎂 อายุประชาชนควรโตปีละ 1 ปี ไม่ใช่เดือนละ 1 ปี — บั๊กเดิมเรียก ageCitizens() ทุกเดือน ทำให้อายุ
+  // วิ่งเร็วกว่าเวลาจริงในเกม 12 เท่า (ผู้อพยพที่เข้ามาอายุ 35 จะตายด้วยวัยชรา (อายุ 99) ภายในแค่ ~5.3 ปี
+  // ในเกม!) ทำให้ประชากรทั้งเมืองหมุนเวียนตายเกือบหมดทุก 5-8 ปี ไม่ว่าจะเล่นนานแค่ไหน กลายเป็นเพดาน
+  // ประชากรที่มองไม่เห็นและไม่เกี่ยวกับการบริหารเลย เพราะเลเวลเมือง (และเพดานภาษี) ผูกกับประชากรล้วนๆ
+  // เมืองจึงติดเลเวลเดิมถาวรทั้งที่ผู้เล่นทำทุกอย่างถูกต้อง ย้ายมาเรียกแค่ตอนขึ้นปีใหม่แทน (ดูบรรทัด ~217)
   preprocessDeaths();
   updateEducation();
   updateEducationStatus();
@@ -408,6 +545,13 @@ applyResearchEffects();
   recordHistorySnapshot();
 
   updateInfo();
+  if (typeof updateFiscalPanel === "function") updateFiscalPanel();
+  if (typeof updateRepairPanel === "function") updateRepairPanel();
+
+  // 🎭 ถ้าเดือนนี้เกิดเหตุการณ์ทางเลือกใหม่ เปิด modal ให้ผู้เล่นตัดสินใจทันที (ต่อจากแดชบอร์ดที่อัปเดตแล้ว)
+  if (crisisJustTriggered && typeof showCrisisModal === "function") {
+    showCrisisModal();
+  }
 
   // 💾 ออโต้เซฟ: ถ้าเกมนี้กำลังเล่นต่อจากเซฟที่มีอยู่ (currentSaveSlot ถูกตั้งค่าไว้
   // ตอนโหลด/บันทึกครั้งล่าสุด) ให้บันทึกทับเซฟเดิมช่องนั้นอัตโนมัติทุกครั้งที่ขึ้นเดือนใหม่

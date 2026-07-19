@@ -73,22 +73,27 @@ function getTaxPolicyDeviation() {
   return avg - 1; // ค่าบวก = ภาษีสูงกว่ามาตรฐานโดยรวม, ค่าลบ = ต่ำกว่ามาตรฐาน
 }
 
-// 💡 หมายเหตุบาลานซ์: เดิมตัวหารรวมของทั้ง 12 กระทรวงคิดเป็นราว 70% ของรายได้ภาษีรวมต่อเดือน
+// 💡 หมายเหตุบาลานซ์ (รอบก่อนหน้า): เดิมตัวหารรวมของทั้ง 12 กระทรวงคิดเป็นราว 70% ของรายได้ภาษีรวมต่อเดือน
 // ทำให้แม้ผู้เล่นที่จ่ายงบครบทุกเดือนก็ยังล้มละลายภายใน 3-4 ปีเพราะเหลืองบดูแล/เงินเดือน/อาหารไม่พอ
 // ปรับตัวหารขึ้นราว 1.6 เท่า (คงสัดส่วนความสำคัญระหว่างกระทรวงเดิมไว้) ให้รวมกันเหลือราว 44% ของรายได้
+//
+// 🔧 หมายเหตุบาลานซ์ (รอบนี้): เดิม getCost() แต่ละกระทรวงบวก civilServants[key]*เงินเดือน เข้าไปเองด้วย
+// ซ้ำกับ payCivilServants() ที่หักเงินเดือนข้าราชการทุกคนรวมทุกแผนกอีกทีทุกเดือนอยู่แล้ว (เท่ากับข้าราชการ
+// 1 คนถูกคิดเงินเดือน 2 รอบจาก 2 ระบบที่ไม่รู้จักกันคนละที่) เอาส่วนที่ซ้ำออก เหลือ payCivilServants()
+// เป็นแหล่งเดียวที่คิดเงินเดือนข้าราชการ ทำให้ต้นทุนการจ้างคนเข้าใจง่ายและคาดเดาได้ชัดเจนขึ้น
 let services = {
-    park: { name: "สวนสาธารณะ", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.park * 15000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
-  health: { name: "สาธารณสุข", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/19) + civilServants.health * 15000 + (yearCount * 600), requiredServants: 1, maxServants: 5 },
-  police: { name: "ตำรวจ", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/29) + civilServants.police * 12000 + (yearCount * 450), requiredServants: 1, maxServants: 5 },
-  infrastructure: { name: "โครงสร้าง", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/22) + civilServants.infrastructure * 15000 + (yearCount * 520), requiredServants: 1, maxServants: 5 },
-  education: { name: "การศึกษา", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/22) + civilServants.education * 15000 + (yearCount * 650), requiredServants: 1, maxServants: 5 },
-  military: { name: "กลาโหม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/35) + civilServants.military * 12000 + (yearCount * 380), requiredServants: 1, maxServants: 5 },
-  transport: { name: "การขนส่ง", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + civilServants.transport * 12000 + (yearCount * 480), requiredServants: 1, maxServants: 5 },
-  scholarship: { name: "ทุนการศึกษา", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.scholarship * 12000 + (yearCount * 440), requiredServants: 1, maxServants: 5 },
-  environment: { name: "สิ่งแวดล้อม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/32) + civilServants.environment * 12000 + (yearCount * 440), requiredServants: 1, maxServants: 5 },
-  disaster: { name: "สาธารณภัย", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/29) + civilServants.disaster * 12000 + (yearCount * 520), requiredServants: 1, maxServants: 5 },
-  tourism: { name: "การท่องเที่ยว", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/38) + civilServants.tourism * 10000 + (yearCount * 360), requiredServants: 1, maxServants: 5 },
-  technology: { name: "เทคโนโลยี", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + civilServants.technology * 15000 + (yearCount * 650), requiredServants: 1, maxServants: 5 }
+    park: { name: "สวนสาธารณะ", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/32) + (yearCount * 600), requiredServants: 1, maxServants: 5 },
+  health: { name: "สาธารณสุข", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/19) + (yearCount * 600), requiredServants: 1, maxServants: 5 },
+  police: { name: "ตำรวจ", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/29) + (yearCount * 450), requiredServants: 1, maxServants: 5 },
+  infrastructure: { name: "โครงสร้าง", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/22) + (yearCount * 520), requiredServants: 1, maxServants: 5 },
+  education: { name: "การศึกษา", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/22) + (yearCount * 650), requiredServants: 1, maxServants: 5 },
+  military: { name: "กลาโหม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/35) + (yearCount * 380), requiredServants: 1, maxServants: 5 },
+  transport: { name: "การขนส่ง", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + (yearCount * 480), requiredServants: 1, maxServants: 5 },
+  scholarship: { name: "ทุนการศึกษา", funded: false, impact: -3, getCost: () => Math.ceil(latestGrossIncome/32) + (yearCount * 440), requiredServants: 1, maxServants: 5 },
+  environment: { name: "สิ่งแวดล้อม", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/32) + (yearCount * 440), requiredServants: 1, maxServants: 5 },
+  disaster: { name: "สาธารณภัย", funded: false, impact: -4, getCost: () => Math.ceil(latestGrossIncome/29) + (yearCount * 520), requiredServants: 1, maxServants: 5 },
+  tourism: { name: "การท่องเที่ยว", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/38) + (yearCount * 360), requiredServants: 1, maxServants: 5 },
+  technology: { name: "เทคโนโลยี", funded: false, impact: -2, getCost: () => Math.ceil(latestGrossIncome/26) + (yearCount * 650), requiredServants: 1, maxServants: 5 }
 };
 
 let servantSalary = 450;
@@ -122,21 +127,51 @@ function getMonthlyMaintenance() {
   const maintenance = calculateMaintenanceCost();
   const scale = getMaintenanceScale(cityLevel);
   const homeCost = Math.ceil(maintenance.homeCost * scale);
-  const shopCost = Math.ceil(maintenance.shopCost * scale * 2.6);
-  const factoryCost = Math.ceil(maintenance.factoryCost * scale * 6.4 * (1 - (researchEffects.factoryCostReduction || 0)));
+  // 📉 ลดตัวคูณร้านค้า/โรงงานลงเล็กน้อย (2.6→2.3, 6.4→5.2) — จากการจำลองเกม (sim harness) พบว่าโรงงาน
+  // เพียงไม่กี่หลังกินสัดส่วนค่าดูแลรวม ~65-70% และเมื่อรวมกับเพดานภาษีต่อเลเวลที่ตายตัว ทำให้เกิด
+  // "บีบทางการเงินแบบมองไม่เห็น" แค่จากประชากรโตภายในเลเวลเดิม โดยผู้เล่นไม่ได้ตัดสินใจอะไรผิดเลย
+  // ย้ายความยากส่วนนี้ไปไว้ที่ระบบใหม่ที่มองเห็นได้และตอบสนองได้แทน (เหตุการณ์ทางเลือก/คูลดาวน์เทศกาล/เครดิตกู้เงิน)
+  const shopCost = Math.ceil(maintenance.shopCost * scale * 2.0);
+  const factoryCost = Math.ceil(maintenance.factoryCost * scale * 4.3 * (1 - (researchEffects.factoryCostReduction || 0)));
   return {
     homeCost, shopCost, factoryCost,
     total: homeCost + shopCost + factoryCost
   };
 }
 
+// 📊 พยากรณ์การคลัง — สรุปให้ผู้เล่นเห็นชัดๆ ว่าเดือนนี้กำไร/ขาดทุนสุทธิเท่าไหร่ และรายได้ใกล้ชนเพดาน
+// ของเลเวลปัจจุบันหรือยัง (ใช้แสดงผลใน UI แทนที่ผู้เล่นต้องมานั่งบวกลบเลขเองถึงจะรู้ว่ากำลังเข้าสู่ช่วงตึงมือ)
+function getFiscalForecast() {
+  const grossIncomeIfFundAll = latestGrossIncome;
+  const maint = getMonthlyMaintenance().total;
+  const deptCostIfAll = Object.values(services).reduce((sum, s) => sum + Math.ceil(Number(s.getCost()) || 0), 0);
+  const foodCostEstimate = Math.ceil(getFoodNeeded() * foodUnitCost * 0.3); // ประมาณคร่าวๆ (ปกติมีสต๊อกกันชนอยู่แล้ว)
+  const totalCost = maint + deptCostIfAll + foodCostEstimate;
+  const netIfFundAll = grossIncomeIfFundAll - totalCost;
+
+  const taxCap = cityTaxCap[cityLevel] || Infinity;
+  const uncappedTax = (() => {
+    let t = 0;
+    homes.forEach(h => t += (taxRate.home[h.size] || 0) * getEffectiveImpact("home"));
+    businesses.forEach(b => { if (b.type === "shop") t += (taxRate.shop[b.size] || 0) * getEffectiveImpact("shop") * (openEconomyBoost || 1); });
+    factories.forEach(f => t += (taxRate.factory[f.size] || 0) * getEffectiveImpact("factory"));
+    return Math.ceil(t);
+  })();
+  const capUtilization = taxCap === Infinity ? 0 : uncappedTax / taxCap;
+
+  return { grossIncomeIfFundAll, maint, deptCostIfAll, foodCostEstimate, netIfFundAll, capUtilization, taxCap, uncappedTax };
+}
+
 // 🍛 อาหารที่ต้องการต่อคนต่อเดือน (ใช้ร่วมกันทุกจุดที่คำนวณ)
 function getPerPersonFood() {
-  let perPersonFood = 80 + Math.floor((happiness - 50) * 0.3);
+  // 🍚 ลดฐานจาก 80 เหลือ 55 หน่วย/คน/เดือน — จากการทดสอบด้วย sim harness พบว่าความต้องการอาหารรวม
+  // (ไม่มีเพดาน โตตรงกับประชากรตลอด) เมื่อเมืองใหญ่ขึ้นจะแซงหน้ารายได้ภาษี (ซึ่งมีเพดานต่อเลเวล) จนกลายเป็น
+  // รายจ่ายก้อนใหญ่ที่สุดของเมือง ใหญ่กว่างบทุกกระทรวงรวมกันเสียอีก ยังคงสัดส่วนที่ความสุขสูง = กินมากขึ้นไว้เหมือนเดิม
+  let perPersonFood = 55 + Math.floor((happiness - 50) * 0.3);
   if (typeof currentSeasonName !== 'undefined' && currentSeasonName === "Summer" && researchEffects.summerFoodBonus) {
     perPersonFood = Math.floor(perPersonFood * (1 - researchEffects.summerFoodBonus));
   }
-  return Math.max(60, perPersonFood);
+  return Math.max(40, perPersonFood);
 }
 
 function getFoodNeeded() {
@@ -151,7 +186,7 @@ function hireCivilServant(dept) {
   }
 
   let index = citizens.findIndex(c => c.knowledge >= 260);
-  if (index === -1) return toast("❌ ต้องการคนเรียนปริญญาโท");
+  if (index === -1) return toast("❌ ต้องการคนระดับปริญญาเอก (ความรู้ ≥ 260)"); // 260 คือเกณฑ์ระดับ "phd" ตาม Education.js ไม่ใช่ "ปริญญาโท" (160-259)
 
   citizens.splice(index, 1);
   civilServants[dept]++;
@@ -159,13 +194,19 @@ function hireCivilServant(dept) {
   updateInfo();
 }
 
-function payCivilServants(days = 30, yearCount = 1) {
-  let totalServants = Object.values(civilServants).reduce((a, b) => a + b, 0);
-  // เดิม: เงินเดือนขึ้นทั้งจากปี (flat +5000/ปี) แล้วยังคูณซ้ำด้วย popFactor อีกชั้น ทำให้ปลายเกมพุ่งเร็วเกินไป
-  // ปรับใหม่: ให้ค่าครองชีพต่อปีโตช้าลง (2500/ปี) และให้ popFactor เป็นตัวขับหลักแทน (สะท้อนเมืองใหญ่ = ครองชีพแพงขึ้นจริง)
+// 💰 อัตราเงินเดือนข้าราชการต่อคนต่อเดือน — ใช้ร่วมกันทั้งจุดที่หักเงินจริง (payCivilServants)
+// และจุดที่แสดงผลใน UI (updateInfo) เพื่อไม่ให้ตัวเลขที่โชว์ผู้เล่นกับที่หักจริงเพี้ยนไปคนละทาง
+// (เดิม updateInfo() มีสูตรคัดลอกของตัวเองที่ใช้ค่าคงที่ต่างจาก payCivilServants() จริง ทำให้ตัวเลข
+// "เงินเดือนข้าราชการ" ที่โชว์ผู้เล่นไม่ตรงกับยอดที่ถูกหักจริงทุกเดือน)
+function getCivilServantSalaryRate(days = 30) {
   let currentSalary = servantSalary * days + (yearCount - 1) * 2500;
   let popFactor = Math.pow(Math.max(1, citizens.length / 100), 0.15);
-  currentSalary = Math.ceil(currentSalary * popFactor);
+  return Math.ceil(currentSalary * popFactor);
+}
+
+function payCivilServants(days = 30, yearCount = 1) {
+  let totalServants = Object.values(civilServants).reduce((a, b) => a + b, 0);
+  let currentSalary = getCivilServantSalaryRate(days);
   let totalCost = totalServants * currentSalary;
 
   if (treasury >= totalCost) {
@@ -173,7 +214,6 @@ function payCivilServants(days = 30, yearCount = 1) {
   } else {
     // จ่ายเท่าที่มี แทนที่จะไม่จ่ายเลย ลดผลกระทบให้สมเหตุสมผลกว่าเดิม
     subtractTreasury(Math.max(0, treasury));
-    happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness - 5);
     toast("⚠️ ขาดเงินเดือนข้าราชการ ความสุขลดลง!");
     updateInfo();
@@ -241,26 +281,40 @@ function subtractTreasury(amount) {
   treasury = Math.ceil(treasury - amount);
 }
 
+// 🧮 รายได้ต่อประเภทอาคาร = อัตราภาษีพื้นฐาน × (เสียหายถาวรที่ยังไม่ซ่อม) × (สภาพอากาศเดือนนี้)
+//    × (ผลกระทบชั่วคราว 1 เดือนจากเหตุการณ์) × (บูสต์พ่อค้าเฉพาะร้านค้า)
+// สี่ชั้นนี้แยกออกจากกันเจตนา (ดู Global.js) เพื่อไม่ให้ระบบหนึ่งไปเขียนทับอีกระบบโดยไม่ตั้งใจ
+function getEffectiveImpact(kind) {
+  const base = (infrastructureImpact[kind] || 1) * (weatherImpact[kind] || 1) * (temporaryImpact[kind] || 1);
+  return kind === "shop" ? base * (merchantShopBoost || 1) : base;
+}
+
 function collectTaxes() {
   let total = 0;
-  
+
   homes.forEach(h => {
-    total += (taxRate.home[h.size] || 0) * infrastructureImpact.home;
+    total += (taxRate.home[h.size] || 0) * getEffectiveImpact("home");
   });
-  
+
   businesses.forEach(b => {
     if (b.type === "shop") {
-      total += (taxRate.shop[b.size] || 0) * infrastructureImpact.shop * (openEconomyBoost || 1) ;
+      total += (taxRate.shop[b.size] || 0) * getEffectiveImpact("shop") * (openEconomyBoost || 1);
     }
   });
-  
+
   factories.forEach(f => {
-    total += (taxRate.factory[f.size] || 0) * infrastructureImpact.factory ;
+    total += (taxRate.factory[f.size] || 0) * getEffectiveImpact("factory");
   });
-  
+
   total = Math.ceil(total);
+  // 🧱 เพดานภาษีแบบ "นุ่ม" แทนเพดานแข็งเดิม — เดิมรายได้เกินเพดานจะถูกตัดทิ้งเป็นศูนย์ทันที (Math.min ตรงๆ)
+  // จากการทดสอบด้วย sim harness พบว่านี่คือสาเหตุหลักที่ทำให้ผู้เล่นที่ไม่แตะอะไรเลยล้มละลายแบบไม่มีสัญญาณ
+  // เตือน: ประชากร/อาคารยังโตต่อเนื่อง (ค่าดูแลก็โตตาม) แต่รายได้แข็งอยู่ที่เพดานเดิมนานหลายเดือนก่อนเลื่อนเลเวล
+  // ตอนนี้ส่วนที่เกินเพดานยังเก็บได้ แค่ในอัตราลดลงมาก (12%) แทนที่จะเป็นศูนย์ ยังคงมีแรงจูงใจให้อยากเลื่อน
+  // เลเวลอยู่ (เพดานใหม่สูงกว่ามาก) แต่ไม่ใช่กำแพงที่ทำให้รายได้หยุดนิ่งสนิทระหว่างทาง
   let taxCap = cityTaxCap[cityLevel] || Infinity;
-  return Math.min(total, taxCap);
+  if (total <= taxCap) return total;
+  return Math.ceil(taxCap + (total - taxCap) * 0.12);
 }
 
 function setTax(type, size) {
@@ -326,7 +380,10 @@ function endGame(reason) {
 function checkGameOver() {
   if (citizens.length === 0) {
     endGame("ไม่มีประชากรเหลืออยู่");
-  } else if (treasury < -1000000) {
+  } else if (monthsInDebt >= 3) {
+    // เดิม: คลังติดลบเกิน 1,000,000 แม้แค่เดือนเดียว (เช่นเผลอซื้ออาหารเป็นก้อนใหญ่ตอนเงินตึงมือ) จบเกมทันที
+    // ทั้งที่แนวโน้มรายเดือนจริงอาจยังแข็งแรง/เป็นบวกอยู่เลยก็ได้ ซึ่งรู้สึกไม่แฟร์และไม่ทันได้แก้ตัว
+    // ใหม่: ต้องติดลบเกินเพดานต่อเนื่อง 3 เดือนติดถึงจะแพ้ (เหมือนระบบอดอยากด้านล่าง) ให้โอกาสฟื้นตัวได้จริง
     endGame("หนี้สินล้นพ้นตัว");
   } else if (happiness <= 0) {
     endGame("ความสุขตกถึงศูนย์");
@@ -459,5 +516,17 @@ for (let i = 0; i < 60; i++) spawnCitizen({ bypassPolicy: true });
 buildHomesIfNeeded();
 refreshTaxSliders();
 updateInfo();
+// ⏳ updateFiscalPanel() อ่านค่า currentEconomy/upcomingEconomy ซึ่งประกาศไว้ใน GlobalEconomy.js
+// ที่โหลดทีหลังไฟล์นี้ (ดูลำดับ <script> ใน index.html) เรียกตอนนี้เลยจะพัง (ตัวแปรยังไม่เกิด)
+// ต้องรอให้สคริปต์ทุกไฟล์โหลดจบก่อนด้วย DOMContentLoaded เหมือนที่ immigration.js ใช้แพทเทิร์นเดียวกัน
+document.addEventListener("DOMContentLoaded", () => {
+  if (typeof updateFiscalPanel === "function") updateFiscalPanel();
+  if (typeof updateRepairPanel === "function") updateRepairPanel();
+  if (typeof updateLoanStatus === "function") updateLoanStatus();
+  // 🎭 ถ้าโหลดหน้ามาพร้อมเซฟที่มีเหตุการณ์ทางเลือกค้างอยู่พอดี ให้เปิด modal ให้เลือกต่อทันที
+  if (typeof activeCrisisEvent !== "undefined" && activeCrisisEvent && typeof showCrisisModal === "function") {
+    showCrisisModal();
+  }
+});
 // 🔕 หยุดรีเฟรชเมื่อสลับไปแท็บ/แอปอื่น (ประหยัดซีพียู/แบต) แล้วรีเฟรชทันทีเมื่อกลับมา
 setInterval(() => { if (!document.hidden) updateInfo(); }, 1000);

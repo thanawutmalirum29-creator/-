@@ -33,7 +33,6 @@ switch(currentSeasonName) {
 
   // ปรับค่า happiness
   if (seasonEffect.happinessChange !== 0) {
-    happiness = Math.min(100, happiness + researchEffects.monthlyHappinessIncrease);
     happiness = Math.max(0, happiness + seasonEffect.happinessChange);
   }
   

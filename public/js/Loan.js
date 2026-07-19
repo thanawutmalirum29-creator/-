@@ -1,11 +1,29 @@
+// 🏦 ระบบเครดิตเมือง — กู้ถี่ในช่วงเวลาสั้นๆ ดอกเบี้ยจะขยับสูงขึ้นและวงเงินกู้สูงสุดจะลดลงชั่วคราว
+// (เดิม: กู้เท่าไหร่ก็ได้ ดอกเบี้ยคงที่ 14% ตลอดกาล ไม่มีผลเสียระยะยาวใดๆ นอกจากยอดหนี้ที่ต้องผ่อน
+// ทำให้กู้ซ้ำๆ ทุกครั้งที่เงินตึงมือได้แบบไม่มีต้นทุนเพิ่มเติม — ตอนนี้กู้ถี่ = แพงขึ้นและกู้ได้น้อยลง
+// นับเฉพาะการกู้ในช่วง 24 เดือนล่าสุด ผ่อนดี ไม่กู้ซ้ำสักพัก เครดิตจะค่อยๆ ฟื้นกลับมาเอง)
+function getLoanCreditStatus() {
+  const nowAbs = (yearCount - 1) * 12 + monthCount;
+  const recentLoans = loanHistory.filter(m => nowAbs - m <= 24).length;
+  const interestRate = Math.min(0.32, 0.14 + recentLoans * 0.04);
+  const maxMultiplier = Math.max(3, 6 - recentLoans * 0.6);
+  return { recentLoans, interestRate, maxMultiplier };
+}
+
 function requestLoan() {
-  const maxBorrow = Math.floor(collectTaxes() * 6);
+  const credit = getLoanCreditStatus();
+  const maxBorrow = Math.floor(collectTaxes() * credit.maxMultiplier);
 
   // ป้องกัน closeModal() หลงเข้าใจว่ากำลังอยู่ในหน้าหมวดหมู่ของศูนย์วิจัย (modalLevel ค้างมาจากที่อื่น)
   modalLevel = null;
 
+  const creditNote = credit.recentLoans > 0
+    ? `<p class="loan-modal-hint">⚠️ เมืองกู้เงินมาแล้ว ${credit.recentLoans} ครั้งในช่วง 2 ปีล่าสุด ดอกเบี้ยตอนนี้จึงขยับเป็น <strong>${(credit.interestRate * 100).toFixed(0)}%</strong> และวงเงินกู้ลดลงเหลือ ${credit.maxMultiplier.toFixed(1)}x ของรายได้ (ไม่กู้ซ้ำสักพักเครดิตจะฟื้นกลับมาเอง)</p>`
+    : `<p class="loan-modal-hint">เครดิตเมืองยังดี ดอกเบี้ยมาตรฐาน <strong>${(credit.interestRate * 100).toFixed(0)}%</strong></p>`;
+
   const html = `
     <h2>📥 กู้เงิน</h2>
+    ${creditNote}
     <p class="loan-modal-hint">ต้องการกู้เงินเท่าไหร่? (กู้ได้สูงสุด <strong>${maxBorrow.toLocaleString()} บาท</strong>)</p>
     <input
       type="number"
@@ -50,15 +68,14 @@ function confirmLoanRequest(maxBorrow) {
 }
 
 function borrowMoney(amount) {
-  // ปรับเพดานกู้ยืมขึ้นเล็กน้อย (5x -> 6x รายได้) ให้เป็นเครื่องมือขยายเมืองที่ใช้ได้จริงมากขึ้น
-  const maxBorrow = Math.floor(collectTaxes() * 6);
+  const credit = getLoanCreditStatus();
+  const maxBorrow = Math.floor(collectTaxes() * credit.maxMultiplier);
   if (amount > maxBorrow) {
-    toast(`⚠️ กู้ได้สูงสุด ${maxBorrow.toLocaleString()} บาท ตามความสามารถรัฐ.`);
+    toast(`⚠️ กู้ได้สูงสุด ${maxBorrow.toLocaleString()} บาท ตามเครดิตปัจจุบันของเมือง (${credit.recentLoans} ครั้งใน 2 ปีล่าสุด)`);
     return;
   }
 
-  // ลดดอกเบี้ยจาก 20% -> 14% ให้การกู้เป็นทางเลือกที่คุ้มค่ากว่าเดิม แต่ยังมีต้นทุนจริง
-  const interest = Math.floor(amount * 0.14);
+  const interest = Math.floor(amount * credit.interestRate);
   const totalDebt = amount + interest;
 
   addTreasury(amount);
@@ -66,8 +83,9 @@ function borrowMoney(amount) {
   loan.remainingDebt += totalDebt;
   loan.monthlyPayment = Math.ceil(totalDebt / 12);
   loan.isPaying = true;
+  loanHistory.push((yearCount - 1) * 12 + monthCount);
 
-  toast(`💰 กู้เงินสำเร็จ ${amount.toLocaleString()} บาท พร้อมดอกเบี้ย 14% รวม ${totalDebt.toLocaleString()} บาท (ผ่อนเดือนละ ${loan.monthlyPayment.toLocaleString()} บาท)`);
+  toast(`💰 กู้เงินสำเร็จ ${amount.toLocaleString()} บาท พร้อมดอกเบี้ย ${(credit.interestRate * 100).toFixed(0)}% รวม ${totalDebt.toLocaleString()} บาท (ผ่อนเดือนละ ${loan.monthlyPayment.toLocaleString()} บาท)`);
 }
 
 function payLoanFromIncome(monthlyIncome) {
@@ -78,7 +96,7 @@ function payLoanFromIncome(monthlyIncome) {
 
   if (loan.remainingDebt <= 0) {
     loan.isPaying = false;
-    toast("✅ ชำระหนี้สินครบแล้ว!");
+    toast("✅ ชำระหนี้สินครบแล้ว!", "success");
   }
 
   return monthlyIncome - payment;

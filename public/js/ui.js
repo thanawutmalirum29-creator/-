@@ -1,5 +1,5 @@
 /* ===============================
-   UI เสริม: แถบสถานะลอย, ค้นหากระทรวง, ปุ่มลอยด่วน
+   UI เสริม: แถบสถานะลอย, ค้นหากระทรวง, แดชบอร์ดมาตรวัด
    ไม่แตะ logic เกมเดิม อ่านค่าตัวแปร global เท่านั้น
    =============================== */
 
@@ -92,38 +92,6 @@ function filterDepartments() {
   const noResult = document.getElementById("deptNoResult");
   if (noResult) noResult.style.display = visibleCount === 0 ? "" : "none";
 }
-
-// ---------- ปุ่มลอยด่วน (Floating Quick Dock) ----------
-function toggleDock() {
-  const dock = document.getElementById("quickDock");
-  if (dock) dock.classList.toggle("open");
-  dismissDockHint();
-}
-
-// ซ่อนคำใบ้ "เมนูลัด" ถาวรหลังผู้เล่นกดปุ่มลัดครั้งแรก (จำค่าไว้ใน localStorage
-// จะได้ไม่ต้องเห็นคำใบ้นี้ซ้ำอีกในการเข้าเล่นครั้งถัดไป)
-function dismissDockHint() {
-  const dockHint = document.getElementById("dockHint");
-  if (dockHint) dockHint.remove();
-  try { localStorage.setItem("dockHintSeen", "1"); } catch (e) { /* เงียบไว้ถ้า localStorage ใช้ไม่ได้ */ }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  // ถ้าเคยกดปุ่มลัดมาแล้วในเครื่องนี้ ไม่ต้องโชว์คำใบ้ "เมนูลัด" อีกตั้งแต่โหลดหน้าแรก
-  let alreadySeen = false;
-  try { alreadySeen = localStorage.getItem("dockHintSeen") === "1"; } catch (e) { /* เงียบไว้ */ }
-  if (alreadySeen) {
-    const dockHint = document.getElementById("dockHint");
-    if (dockHint) dockHint.remove();
-  }
-});
-
-// ปิดเมนูลอยเมื่อกดที่อื่นบนหน้าจอ (มือถือใช้งานง่ายขึ้น)
-document.addEventListener("click", (e) => {
-  const dock = document.getElementById("quickDock");
-  if (!dock || !dock.classList.contains("open")) return;
-  if (!dock.contains(e.target)) dock.classList.remove("open");
-});
 
 document.addEventListener("DOMContentLoaded", () => {
   updateStatusBar();
